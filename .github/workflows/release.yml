@@ -1,0 +1,61 @@
+name: Build and Release Canister
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dfx
+        uses: dfinity/setup-dfx@main
+        with:
+          dfx-version: "0.15.1"
+
+      - name: Confirm dfx installation
+        run: dfx --version
+
+      - uses: ZenVoich/setup-mops@v1
+
+      - name: Ensure moc is installed
+        run: mops toolchain use moc latest || mops toolchain install
+
+      - name: Add base
+        run: mops add base
+
+      - name: Add map
+        run: mops add map
+
+      - name: Build canister
+        run: |
+          dfx start --background
+          dfx canister create --all
+          dfx build
+
+      - name: Compress wasm
+        run: gzip -c .dfx/local/canisters/blueband-db-backend/blueband-db.wasm > ./blueband-db.wasm.gz
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      - name: Upload wasm.gz
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./blueband-db.wasm.gz
+          asset_name: blueband-db.wasm.gz
+          asset_content_type: application/gzip
