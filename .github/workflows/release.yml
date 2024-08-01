@@ -66,6 +66,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./.dfx/ic/canisters/blueband-db-backend/blueband-db-backend.did
+          asset_path: ./.dfx/local/canisters/blueband-db-backend/blueband-db-backend.did
           asset_name: blueband-db-backend.did
           asset_content_type: text/plain
