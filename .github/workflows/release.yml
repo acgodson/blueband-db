@@ -3,7 +3,7 @@ name: Build and Release Canister
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   build-and-release:
@@ -20,7 +20,7 @@ jobs:
         run: dfx --version
 
       - uses: ZenVoich/setup-mops@v1
-      
+
       - name: Ensure moc is installed
         run: mops toolchain use moc latest || mops toolchain install
 
@@ -60,4 +60,12 @@ jobs:
           asset_name: blueband-db-backend.wasm.gz
           asset_content_type: application/gzip
 
-   
+      - name: Upload did
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./.dfx/ic/canisters/blueband-db-backend/blueband-db-backend.did
+          asset_name: blueband-db-backend.did
+          asset_content_type: text/plain
