@@ -3,7 +3,12 @@ import Cycles "mo:base/ExperimentalCycles";
 import Principal "mo:base/Principal";
 
 import Storage "./bucket/BucketProvider";
+
+import Embeddings "./OpenAIEmbeddings";
+
 import Types "./Types";
+
+// import { SECRET } "mo:env";
 
 shared ({ caller }) actor class Blueband() {
 
@@ -13,8 +18,16 @@ shared ({ caller }) actor class Blueband() {
     type VectorStore = Storage.VectorStore;
     type MetadataList = Storage.MetadataList;
     type DocumentMetadata = Storage.DocumentMetadata;
+    type EmbeddingsResponse = Embeddings.EmbeddingsResponse;
+    public type Transform = shared query Embeddings.TransformArgs -> async Embeddings.HttpResponsePayload;
+    type OpenAIAPI = Text -> Embeddings.OpenAIEmbeddings;
 
     stable var state = Types.empty();
+
+    private let openAIApi = func(SECRET : Text) : Embeddings.OpenAIEmbeddings {
+        return Embeddings.OpenAIEmbeddings(SECRET, "text-embedding-ada-002") : Embeddings.OpenAIEmbeddings; // Specify the return type explicitly
+    };
+    // let openAI = Embeddings.OpenAIEmbeddings(SECRET, "text-embedding-ada-002");
 
     //////////////////////////
     // Storage
@@ -94,6 +107,32 @@ shared ({ caller }) actor class Blueband() {
 
     public shared func titleToDocumentID(collectionId : Text, title : Text) : async ?Text {
         return await Storage.documentIdToTitle(state.collections, collectionId, title);
+    };
+
+    // Update caller's profile
+    public shared func generateEmbeddings(texts : [Text], secret : Text) : async Embeddings.EmbeddingsResponse {
+        await openAIApi(secret).createEmbeddings(texts, transform);
+    };
+
+    public shared query func transform(args : Embeddings.TransformArgs) : async Embeddings.HttpResponsePayload {
+        {
+            status = args.response.status;
+            body = args.response.body;
+            headers = [
+                {
+                    name = "Content-Security-Policy";
+                    value = "default-src 'self'";
+                },
+                { name = "Referrer-Policy"; value = "strict-origin" },
+                { name = "Permissions-Policy"; value = "geolocation=(self)" },
+                {
+                    name = "Strict-Transport-Security";
+                    value = "max-age=63072000";
+                },
+                { name = "X-Frame-Options"; value = "DENY" },
+                { name = "X-Content-Type-Options"; value = "nosniff" },
+            ];
+        };
     };
 
     // Add Cycles Functions

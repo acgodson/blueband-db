@@ -25,3 +25,5 @@ dist/
 .env
 
 .mops
+
+src/blueband-db/http_Types.mo
