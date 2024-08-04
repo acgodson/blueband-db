@@ -53,6 +53,7 @@ shared ({ caller }) actor class Blueband() {
         vector_id : Text,
         start : Nat,
         end : Nat,
+        norm : Float,
         vector : [Float],
     ) : async Text {
         let result = await Storage.addVector(
@@ -62,6 +63,7 @@ shared ({ caller }) actor class Blueband() {
             vector_id,
             start,
             end,
+            norm,
             vector,
         );
         result;

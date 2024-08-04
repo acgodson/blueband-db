@@ -136,6 +136,7 @@ shared ({ caller }) actor class Bucket() {
                     startPos = data.startPos;
                     endPos = data.endPos;
                     vector = data.vector;
+                    norm = data.norm;
                 };
                 do ? {
                     ignore Map.put(
@@ -178,6 +179,7 @@ shared ({ caller }) actor class Bucket() {
                     startPos = d.startPos;
                     endPos = d.endPos;
                     vector = d.vector;
+                    norm = d.norm;
                 };
             },
         );

@@ -16,7 +16,6 @@ import Types "../Types";
 
 import StorageTypes "./Types";
 
-
 import { sliceText } "../Utils";
 
 module BucketProvider {
@@ -113,6 +112,7 @@ module BucketProvider {
         vectorId : Text,
         start : Nat,
         end : Nat,
+        norm : Float,
         vector : [Float],
     ) : async Text {
 
@@ -122,6 +122,7 @@ module BucketProvider {
             startPos = start;
             endPos = end;
             vector = vector;
+            norm = norm;
         };
         let bucket : Bucket = await getBucket(collectionId, db);
         //TODO: verify that document metadata still exisits
