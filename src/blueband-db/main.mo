@@ -104,11 +104,11 @@ shared ({ caller }) actor class Blueband() {
     };
 
     public shared func documentIDToTitle(collectionId : Text, documentId : Text) : async ?Text {
-        return await Storage.titleToDocumentID(state.collections, collectionId, documentId);
+        return await Storage.documentIdToTitle(state.collections, collectionId, documentId);
     };
 
     public shared func titleToDocumentID(collectionId : Text, title : Text) : async ?Text {
-        return await Storage.documentIdToTitle(state.collections, collectionId, title);
+        return await Storage.titleToDocumentID(state.collections, collectionId, title);
     };
 
     // Update caller's profile
