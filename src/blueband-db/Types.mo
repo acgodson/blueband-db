@@ -30,6 +30,7 @@ module BlueBandTypes {
         documentId : DocumentId;
         startPos : Nat;
         endPos : Nat;
+        norm: Float;
         vector : [Float];
     };
 
