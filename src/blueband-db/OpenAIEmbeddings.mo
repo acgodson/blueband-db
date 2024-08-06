@@ -10,6 +10,9 @@ import Blob "mo:base/Blob";
 import Iter "mo:base/Iter";
 import Cycles "mo:base/ExperimentalCycles";
 import Nat8 "mo:base/Nat8";
+import Hash "mo:base/Hash";
+import Nat32 "mo:base/Nat32";
+import { toHex; generateRandomID } "./Utils"
 
 module {
     public type EmbeddingsResponse = {
@@ -73,7 +76,7 @@ module {
     public class OpenAIEmbeddings(apiKey : Text, model : Text) {
         private let API_KEY = apiKey;
         private let MODEL = model;
-        private let ENDPOINT = "https://api.openai.com/v1/embeddings";
+        private let ENDPOINT = "https://c107-102-90-42-249.ngrok-free.app/api/proxy";
         public type Transform = shared query TransformArgs -> async HttpResponsePayload;
 
         public func createEmbeddings(inputs : [Text], transform : Transform) : async EmbeddingsResponse {
@@ -111,9 +114,18 @@ module {
                 function = transform;
                 context = Blob.fromArray([]);
             };
+
+            let key = await generateIdempotencyKey(request);
+
+            Debug.print("impotency key" # key);
             let request_headers = [
                 { name = "Content-Type"; value = "application/json" },
                 { name = "Authorization"; value = "Bearer " # api_key },
+                {
+                    name = "idempotency-key";
+                    value = key;
+                },
+
             ];
 
             let http_request : Request = {
@@ -139,6 +151,7 @@ module {
                         case (null) { "" };
                         case (?y) { y };
                     };
+                    Debug.print("this response" # responseBody);
                     // let x = parseEmbeddings(responseBody);
                     #ok(responseBody);
                 } else if (httpResponse.status == 429) {
@@ -160,6 +173,13 @@ module {
         inputArray #= "]";
 
         "{\"input\":" # inputArray # ",\"model\":\"" # request.model # "\"}";
+    };
+
+    private func generateIdempotencyKey(request : CreateEmbeddingRequest) : async Text {
+        let joined = Text.join(", ", request.input.vals());
+        let inputHash = Text.hash(joined);
+        let id = await generateRandomID(Nat32.toText(inputHash));
+        id;
     };
 
 };

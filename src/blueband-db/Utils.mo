@@ -2,6 +2,8 @@ import Random "mo:base/Random";
 import Nat8 "mo:base/Nat8";
 import Nat "mo:base/Nat";
 import Text "mo:base/Text";
+import Nat32 "mo:base/Nat32";
+import Char "mo:base/Char";
 
 module {
 
@@ -34,6 +36,30 @@ module {
             i := Nat.add(i, 1);
         };
         slicedText;
+    };
+
+    public func toHex(combinedHash : Nat32) : Text {
+        let hex : [Char] = [
+            '0',
+            '1',
+            '2',
+            '3',
+            '4',
+            '5',
+            '6',
+            '7',
+            '8',
+            '9',
+            'a',
+            'b',
+            'c',
+            'd',
+            'e',
+            'f',
+        ];
+        let c0 = hex[Nat32.toNat(combinedHash / 16)];
+        let c1 = hex[Nat32.toNat(combinedHash % 16)];
+        Char.toText(c0) # Char.toText(c1);
     };
 
 };
