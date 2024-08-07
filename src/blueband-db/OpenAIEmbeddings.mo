@@ -10,9 +10,8 @@ import Blob "mo:base/Blob";
 import Iter "mo:base/Iter";
 import Cycles "mo:base/ExperimentalCycles";
 import Nat8 "mo:base/Nat8";
-import Hash "mo:base/Hash";
 import Nat32 "mo:base/Nat32";
-import { toHex; generateRandomID } "./Utils"
+// import { generateRandomID } "./Utils"
 
 module {
     public type EmbeddingsResponse = {
@@ -115,7 +114,7 @@ module {
                 context = Blob.fromArray([]);
             };
 
-            let key = await generateIdempotencyKey(request);
+            let key = generateIdempotencyKey(request);
 
             Debug.print("impotency key" # key);
             let request_headers = [
@@ -175,11 +174,18 @@ module {
         "{\"input\":" # inputArray # ",\"model\":\"" # request.model # "\"}";
     };
 
-    private func generateIdempotencyKey(request : CreateEmbeddingRequest) : async Text {
+    // private func generateIdempotencyKey(request : CreateEmbeddingRequest) : async Text {
+    //     let joined = Text.join(", ", request.input.vals());
+    //     let inputHash = Text.hash(joined);
+    //     let id = await generateRandomID(Nat32.toText(inputHash));
+    //     id;
+    // };
+
+    private func generateIdempotencyKey(request : CreateEmbeddingRequest) : Text {
         let joined = Text.join(", ", request.input.vals());
         let inputHash = Text.hash(joined);
-        let id = await generateRandomID(Nat32.toText(inputHash));
-        id;
+        // Generate a deterministic key based on the input hash
+        Nat32.toText(inputHash);
     };
 
 };
