@@ -75,7 +75,7 @@ module {
     public class OpenAIEmbeddings(apiKey : Text, model : Text) {
         private let API_KEY = apiKey;
         private let MODEL = model;
-        private let ENDPOINT = "https://c107-102-90-42-249.ngrok-free.app/api/proxy";
+        private let ENDPOINT = "https://main.d3io3l9ylcsplj.amplifyapp.com/api/proxy";
         public type Transform = shared query TransformArgs -> async HttpResponsePayload;
 
         public func createEmbeddings(inputs : [Text], transform : Transform) : async EmbeddingsResponse {
@@ -173,18 +173,9 @@ module {
 
         "{\"input\":" # inputArray # ",\"model\":\"" # request.model # "\"}";
     };
-
-    // private func generateIdempotencyKey(request : CreateEmbeddingRequest) : async Text {
-    //     let joined = Text.join(", ", request.input.vals());
-    //     let inputHash = Text.hash(joined);
-    //     let id = await generateRandomID(Nat32.toText(inputHash));
-    //     id;
-    // };
-
     private func generateIdempotencyKey(request : CreateEmbeddingRequest) : Text {
         let joined = Text.join(", ", request.input.vals());
         let inputHash = Text.hash(joined);
-        // Generate a deterministic key based on the input hash
         Nat32.toText(inputHash);
     };
 
