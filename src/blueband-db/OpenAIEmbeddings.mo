@@ -75,7 +75,7 @@ module {
     public class OpenAIEmbeddings(apiKey : Text, model : Text) {
         private let API_KEY = apiKey;
         private let MODEL = model;
-        private let ENDPOINT = "https://main.d3io3l9ylcsplj.amplifyapp.com/api/proxy";
+        private let ENDPOINT = "https://blueband-db-442d8.web.app/api/proxy";
         public type Transform = shared query TransformArgs -> async HttpResponsePayload;
 
         public func createEmbeddings(inputs : [Text], transform : Transform) : async EmbeddingsResponse {
