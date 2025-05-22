@@ -1,14 +1,48 @@
 {
   "canisters": {
-    "blueband-db-backend": {
+    "blueband-db": {
       "main": "src/blueband-db/main.mo",
       "type": "motoko"
+    },
+    "blueband-compute": {
+      "type": "custom",
+      "build": "(cd src/blueband-compute && cargo build --target wasm32-unknown-unknown --package blueband-compute --release)",
+      "candid": "src/blueband-compute/blueband_compute.did",
+      "wasm": "src/blueband-compute/target/wasm32-unknown-unknown/release/blueband_compute.wasm"
+    },
+    "test_token": {
+      "main": "src/test-token/main.mo",
+      "type": "motoko"
+    },
+    "internet_identity": {
+      "type": "custom",
+      "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
+      "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz",
+      "init_arg": "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}})",
+      "remote": {
+        "id": {
+          "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+        }
+      },
+      "frontend": {}
+    },
+    "frontend": {
+      "source": [
+        "src/clanopedia_frontend/dist"
+      ],
+      "type": "assets",
+      "dependencies": [
+        "blueband-db",
+        "blueband-compute",
+        "test_token",
+        "internet_identity"
+      ]
     }
   },
   "defaults": {
     "build": {
-      "args": "",
-      "packtool": "mops sources"
+      "packtool": "mops sources",
+      "args": ""
     }
   },
   "output_env_file": ".env",

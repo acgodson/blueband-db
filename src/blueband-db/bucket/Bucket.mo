@@ -1,235 +1,245 @@
+//bucket/Bucket.mo
 import Cycles "mo:base/ExperimentalCycles";
-
-import Nat "mo:base/Nat";
 import Debug "mo:base/Debug";
-import Blob "mo:base/Blob";
-import Text "mo:base/Text";
+import Nat "mo:base/Nat";
 import Nat64 "mo:base/Nat64";
-import Buffer "mo:base/Buffer";
 import Prim "mo:prim";
+import Array "mo:base/Array";
+import Buffer "mo:base/Buffer";
 
 import Map "mo:map/Map";
-import { thash; nhash } "mo:map/Map";
-import BucketTypes "./Types";
-import Utils "../Utils";
+import { thash } "mo:map/Map";
+import Types "../Types";
 
 shared ({ caller }) actor class Bucket() {
+    type DocumentId = Types.DocumentId;
+    type ChunkId = Types.ChunkId;
+    type VectorId = Types.VectorId;
+    type DocumentMetadata = Types.DocumentMetadata;
+    type SemanticChunk = Types.SemanticChunk;
+    type Vector = Types.Vector;
+    type BucketState = Types.BucketState;
 
-    type DocumentId = BucketTypes.DocumentId;
-    type VectorId = BucketTypes.VectorId;
-    type ChunkId = BucketTypes.ChunkId;
-    type State = BucketTypes.CanisterState;
+    // Constants
+    let MAX_CYCLES = 100_000_000_000_000; // Cap for cycle balance
 
-    type DocumentMetadata = BucketTypes.DocumentMetadata;
-    type Vector = BucketTypes.Vector;
+    // State
+    stable var state = Types.emptyBucket();
 
-    // test constants
-    let MAX_DOCUMENT_SIZE = 20_000_000_000_000;
-
-    stable var state = BucketTypes.empty();
-    stable var chunkCounter : Nat = 0;
-    private var _vectorIdToDocId : Map.Map<Text, Text> = Map.new<Text, Text>();
-
-    //current size of cannister
-    public func getSize() : async Nat {
+    // Canister size for monitoring
+    public query func getSize() : async Nat {
         Debug.print("canister balance: " # Nat.toText(Cycles.balance()));
         Prim.rts_memory_size();
     };
 
-    //Used when adding next recipe
-    public func lastCounter() : async Nat {
-        chunkCounter;
-    };
-    // increment number
-    private func inc() { chunkCounter += 1 };
-
-    //  save Recipe info/metadata
-    private func _insertMetadata(documentId : DocumentId, metadata : DocumentMetadata) : ?DocumentId {
-        switch (Map.get(state.metadatas, thash, documentId)) {
-            case (?_) { /* error -- ID already taken. */ return null };
+    // Document operations
+    public shared func insertDocument(metadata : DocumentMetadata) : async ?DocumentId {
+        switch (Map.get(state.documents, thash, metadata.id)) {
+            case (?_) { return null }; // Document ID already exists
             case null {
-                Debug.print("new recipe id is..." # debug_show (documentId));
-                let _metadata = {
-                    id = documentId;
-                    name = metadata.name;
-                    chunkStartId = metadata.chunkStartId;
-                    chunkEndId = metadata.chunkEndId;
-                    chunkCount = metadata.chunkCount;
-                    size = metadata.size;
-                    isEmbedded = metadata.isEmbedded;
-                };
-                ignore Map.put(state.metadatas, thash, documentId, _metadata);
-                ?documentId;
+                ignore Map.put(state.documents, thash, metadata.id, metadata);
+                ?metadata.id;
             };
         };
     };
 
-    // update catalog: which is amapping of each new embeddings to vector-id generated from an embedding to a corresponding recipe-id
-    private func startUpdate(documentId : DocumentId, vectorId : VectorId) {
-        switch (Map.get(state.metadatas, thash, documentId)) {
-            case null {};
+    public shared func insertChunk(documentId : DocumentId, chunkId : ChunkId, chunk : SemanticChunk) : async ?() {
+        // Verify document exists
+        switch (Map.get(state.documents, thash, documentId)) {
+            case null { return null };
             case (?_) {
-                let updatedVectorIdToDocId = Map.clone(_vectorIdToDocId);
-                ignore Map.put(updatedVectorIdToDocId, thash, vectorId, documentId);
-                _vectorIdToDocId := updatedVectorIdToDocId;
+                // Store chunk
+                ignore Map.put(state.chunks, thash, chunkId, chunk);
+                // Store chunk to document mapping
+                ignore Map.put(state.chunk_to_document, thash, chunkId, documentId);
+                ?();
             };
         };
     };
 
-    // finish embedding
-    public func endUpdate(documentId : DocumentId) : async () {
-        switch (Map.get(state.metadatas, thash, documentId)) {
+    public shared func insertVector(vector : Vector) : async ?() {
+        // Verify document exists
+        switch (Map.get(state.documents, thash, vector.document_id)) {
+            case null { return null };
+            case (?_) {
+                // Store vector
+                ignore Map.put(state.vectors, thash, vector.id, vector);
+                // Store vector to document mapping
+                ignore Map.put(state.vector_to_document, thash, vector.id, vector.document_id);
+                ?();
+            };
+        };
+    };
+
+    public shared func updateDocumentStatus(documentId : DocumentId, isEmbedded : Bool) : async ?() {
+        switch (Map.get(state.documents, thash, documentId)) {
+            case null { return null };
             case (?doc) {
-                let metadata = {
+                let updatedDoc = {
                     id = doc.id;
-                    name = doc.name;
-                    chunkStartId = doc.chunkStartId;
-                    chunkEndId = doc.chunkEndId;
-                    chunkCount = doc.chunkCount;
+                    title = doc.title;
+                    content_type = doc.content_type;
+                    source_url = doc.source_url;
+                    timestamp = doc.timestamp;
+                    total_chunks = doc.total_chunks;
                     size = doc.size;
-                    isEmbedded = true;
+                    is_embedded = isEmbedded;
                 };
-                ignore Map.put(state.metadatas, thash, doc.id, metadata);
-            };
-            case null {};
-        };
-    };
-
-    // instantiate a new document metadata and returns an id
-    public func insertMetadata(metadata : DocumentMetadata) : async ?DocumentId {
-        do ? {
-            let documentId = await Utils.generateRandomID(metadata.name);
-            _insertMetadata(documentId, metadata)!;
-        };
-    };
-
-    // generate chunkID- updating global counter
-    func chunkId() : ChunkId {
-        inc();
-        chunkCounter;
-    };
-
-    // save recipe raw data
-    public func insertChunk(documentId : DocumentId, chunkData : Blob) : async ?() {
-        do ? {
-            let id = chunkCounter;
-            ignore Map.put(
-                state.chunks,
-                nhash,
-                id,
-                chunkData,
-            );
-            Debug.print("new chunk added with id" # debug_show (id) # " from recipe with id: " # debug_show (documentId) # " and " # debug_show (chunkCounter) # "  and chunk size..." # debug_show (Blob.toArray(chunkData).size()));
-            ignore chunkId();
-        };
-    };
-
-    // store recipe embeddings
-    public func addVector(data : Vector) : async ?() {
-        let existingVector = Map.get(state.vectors, thash, data.id);
-        switch (existingVector) {
-            case (null) {
-
-                let vectorData = {
-                    id = data.id;
-                    documentId = data.documentId;
-                    startPos = data.startPos;
-                    endPos = data.endPos;
-                    vector = data.vector;
-                    norm = data.norm;
-                };
-                do ? {
-                    ignore Map.put(
-                        state.vectors,
-                        thash,
-                        data.id,
-                        vectorData,
-                    );
-                    startUpdate(data.documentId, data.id);
-                };
-            };
-            case (?_) {
-                // Vector already exists
-                return null;
+                ignore Map.put(state.documents, thash, documentId, updatedDoc);
+                ?();
             };
         };
     };
 
-    // List  infos/metadata of all recipes
-    public query func listDocumentMetadata() : async [DocumentMetadata] {
-        let b = Buffer.Buffer<DocumentMetadata>(0);
-        let _ = do ? {
-            for (
-                (f, _) in Map.entries(state.metadatas)
-            ) {
-                b.add(_getMetadata(f)!);
-            };
-        };
-        Buffer.toArray(b);
+    // Query operations
+    public query func getDocument(documentId : DocumentId) : async ?DocumentMetadata {
+        Map.get(state.documents, thash, documentId);
     };
 
-    // return all recipes embeddings
-    public query func listVectors() : async { items : [Vector] } {
-        let transformedVectorDataList = Map.toArrayMap<Text, Vector, Vector>(
-            state.vectors,
-            func(_, d) {
-                ?{
-                    id = d.id;
-                    documentId = d.documentId;
-                    startPos = d.startPos;
-                    endPos = d.endPos;
-                    vector = d.vector;
-                    norm = d.norm;
+    public query func getChunk(chunkId : ChunkId) : async ?SemanticChunk {
+        Map.get(state.chunks, thash, chunkId);
+    };
+
+    public query func getDocumentChunks(documentId : DocumentId) : async [SemanticChunk] {
+        let results = Buffer.Buffer<SemanticChunk>(0);
+
+        for ((id, chunk) in Map.entries(state.chunks)) {
+            switch (Map.get(state.chunk_to_document, thash, id)) {
+                case (?docId) {
+                    if (docId == documentId) {
+                        results.add(chunk);
+                    };
                 };
-            },
+                case null {};
+            };
+        };
+
+        // Sort by position before returning
+        let sorted = Array.sort<SemanticChunk>(
+            Buffer.toArray(results),
+            func(a, b) { Nat.compare(a.position, b.position) },
         );
-        { items = transformedVectorDataList };
+
+        sorted;
     };
 
-    func _getMetadata(documentId : DocumentId) : ?DocumentMetadata {
-        do ? {
-            let v = Map.get(state.metadatas, thash, documentId)!;
-            {
-                id = v.id;
-                name = v.name;
-                size = v.size;
-                chunkEndId = v.chunkEndId;
-                chunkStartId = v.chunkStartId;
-                chunkCount = v.chunkCount;
-                isEmbedded = v.isEmbedded;
+    // public query func getVectors(
+    //     filter : ?{
+    //         document_id : ?DocumentId;
+    //         chunk_id : ?ChunkId;
+    //         limit : ?Nat;
+    //     }
+    // ) : async [Vector] {
+    //     let results = Buffer.Buffer<Vector>(0);
+    //     let limit_value = switch (filter) {
+    //         case (?{ limit = ?l }) { l };
+    //         case _ { 1000 }; // Default limit
+    //     };
+
+    //     label filtering for ((id, vector) in Map.entries(state.vectors)) {
+    //         // Apply document filter if provided
+    //         switch (filter) {
+    //             case (?{ document_id = ?doc_id }) {
+    //                 if (vector.document_id != doc_id) continue filtering;
+    //             };
+    //             case _ {};
+    //         };
+
+    //         // Apply chunk filter if provided
+    //         switch (filter) {
+    //             case (?{ chunk_id = ?chunk_id }) {
+    //                 if (vector.chunk_id != chunk_id) continue filtering;
+    //             };
+    //             case _ {};
+    //         };
+
+    //         results.add(vector);
+
+    //         // Apply limit
+    //         if (results.size() >= limit_value) {
+    //             break filtering;
+    //         };
+    //     };
+
+    //     Buffer.toArray(results);
+    // };
+
+    public shared func getVectors(
+        filter : ?{
+            document_id : ?DocumentId;
+            chunk_id : ?ChunkId;
+            limit : ?Nat;
+        }
+    ) : async [Vector] {
+        let results = Buffer.Buffer<Vector>(0);
+        let limit_value = switch (filter) {
+            case (?{ limit = ?l }) { l };
+            case _ { 1000 }; // Default limit
+        };
+
+        label filtering for ((id, vector) in Map.entries(state.vectors)) {
+            // Apply document filter if provided
+            switch (filter) {
+                case (?{ document_id = ?doc_id }) {
+                    if (vector.document_id != doc_id) continue filtering;
+                };
+                case _ {};
+            };
+
+            // Apply chunk filter if provided
+            switch (filter) {
+                case (?{ chunk_id = ?chunk_id }) {
+                    if (vector.chunk_id != chunk_id) continue filtering;
+                };
+                case _ {};
+            };
+
+            results.add(vector);
+
+            // Apply limit
+            if (results.size() >= limit_value) {
+                break filtering;
+            };
+        };
+
+        Buffer.toArray(results);
+    };
+
+    public query func listDocuments() : async [DocumentMetadata] {
+        // Fix: Map.toArray expects 2 type arguments, not 3
+        let docs = Buffer.Buffer<DocumentMetadata>(0);
+        for ((_, doc) in Map.entries(state.documents)) {
+            docs.add(doc);
+        };
+        Buffer.toArray(docs);
+    };
+
+    public shared func deleteVector(vectorId : VectorId) : async ?() {
+        switch (Map.get(state.vectors, thash, vectorId)) {
+            case null { return null };
+            case (?vector) {
+                // Verify vector belongs to the document
+                switch (Map.get(state.vector_to_document, thash, vectorId)) {
+                    case null { return null };
+                    case (?docId) {
+                        if (docId != vector.document_id) {
+                            Debug.print("Vector ownership mismatch");
+                            return null;
+                        };
+                        Map.delete(state.vectors, thash, vectorId);
+                        Map.delete(state.vector_to_document, thash, vectorId);
+                        ?();
+                    };
+                };
             };
         };
     };
 
-    public query func getMetadata(documentId : DocumentId) : async ?DocumentMetadata {
-        do ? {
-            _getMetadata(documentId)!;
-        };
-    };
-
-    public query func getChunk(chunkId : Nat) : async ?Text {
-        // TODO: retrieve all existing chunks of a recipe ID
-        do ? {
-            let blob = Map.get(state.chunks, nhash, chunkId);
-            return Text.decodeUtf8(blob!);
-        };
-    };
-
-    public query func vectorIdToRecipeId(vectorId : Text) : async ?Text {
-        do ? {
-            let v = Map.get(_vectorIdToDocId, thash, vectorId)!;
-            return ?v;
-        };
-    };
-
+    // Cycle management
     public func wallet_receive() : async { accepted : Nat64 } {
         let available = Cycles.available();
-        let accepted = Cycles.accept<system>(Nat.min(available, MAX_DOCUMENT_SIZE));
+        let acceptable = Nat.min(available, MAX_CYCLES);
+        let accepted = Cycles.accept<system>(acceptable);
         { accepted = Nat64.fromNat(accepted) };
     };
-
-    public func wallet_balance() : async Nat {
-        return Cycles.balance();
-    };
-
 };

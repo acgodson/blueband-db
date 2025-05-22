@@ -1,0 +1,302 @@
+// src/components/molecules/Modals/AddDocumentModal/AddDocumentModal.scss
+
+// Modal overlay
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+    backdrop-filter: blur(4px);
+  }
+  
+  // Modal container
+  .modal {
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 28rem;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    animation: modalSlideIn 0.2s ease-out;
+  
+    &--large {
+      max-width: 42rem;
+    }
+  
+    form {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-height: 90vh;
+    }
+  
+    &__header {
+      padding: 1.5rem 1.5rem 1rem;
+      border-bottom: 1px solid var(--gray-200);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+  
+      h3 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--gray-900);
+        margin: 0;
+      }
+    }
+  
+    &__close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      color: var(--gray-400);
+      cursor: pointer;
+      padding: 0;
+      width: 2rem;
+      height: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 0.25rem;
+      transition: all 0.2s ease;
+  
+      &:hover:not(:disabled) {
+        background-color: var(--gray-100);
+        color: var(--gray-600);
+      }
+  
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  
+    &__content {
+      flex: 1;
+      padding: 1.5rem;
+      overflow-y: auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+  
+    &__footer {
+      padding: 1rem 1.5rem 1.5rem;
+      border-top: 1px solid var(--gray-200);
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      flex-shrink: 0;
+      background: var(--white);
+    }
+  }
+  
+  // Form elements
+  .form-group {
+    margin-bottom: 0;
+  }
+  
+  .form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+  }
+  
+  .form-input,
+  .form-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--border-radius);
+    font-size: 0.875rem;
+    font-family: inherit;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  
+    &:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+  
+    &:disabled {
+      background-color: var(--gray-50);
+      color: var(--gray-500);
+      cursor: not-allowed;
+    }
+  
+    &::placeholder {
+      color: var(--gray-400);
+    }
+  }
+  
+  .form-textarea {
+    resize: vertical;
+    min-height: 8rem;
+    line-height: 1.5;
+  }
+  
+  .form-hint {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .character-count {
+    font-weight: 500;
+    color: var(--gray-600);
+  }
+  
+  // Error message
+  .error-message {
+    background: var(--danger-color);
+    color: var(--white);
+    padding: 0.75rem;
+    border-radius: var(--border-radius);
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  
+  // Info card
+  .form-info {
+    margin-top: 0;
+  }
+  
+  .info-card {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    display: flex;
+    gap: 0.75rem;
+  
+    &__icon {
+      font-size: 1.25rem;
+      flex-shrink: 0;
+    }
+  
+    &__content {
+      flex: 1;
+  
+      h4 {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--gray-900);
+        margin: 0 0 0.5rem 0;
+      }
+  
+      ul {
+        margin: 0;
+        padding-left: 1rem;
+        font-size: 0.8rem;
+        color: var(--gray-600);
+  
+        li {
+          margin-bottom: 0.25rem;
+          line-height: 1.4;
+  
+          &:last-child {
+            margin-bottom: 0;
+          }
+        }
+      }
+    }
+  }
+  
+  // Button styles (if not already defined globally)
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    text-decoration: none;
+  
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  
+    &--primary {
+      background-color: var(--primary-color);
+      color: var(--white);
+  
+      &:hover:not(:disabled) {
+        background-color: var(--primary-dark);
+      }
+    }
+  
+    &--outline {
+      border-color: var(--gray-300);
+      color: var(--gray-700);
+      background-color: var(--white);
+  
+      &:hover:not(:disabled) {
+        background-color: var(--gray-50);
+      }
+    }
+  }
+  
+  // Animation
+  @keyframes modalSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-1rem) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  
+  // Responsive design
+  @media (max-width: 768px) {
+    .modal {
+      max-width: 100%;
+      margin: 1rem;
+      max-height: calc(100vh - 2rem);
+  
+      &--large {
+        max-width: 100%;
+      }
+  
+      &__content {
+        padding: 1rem;
+      }
+  
+      &__footer {
+        padding: 0.75rem 1rem 1rem;
+        flex-direction: column-reverse;
+  
+        .btn {
+          width: 100%;
+        }
+      }
+    }
+  
+    .form-textarea {
+      min-height: 6rem;
+    }
+  }

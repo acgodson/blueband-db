@@ -8,23 +8,30 @@ import Char "mo:base/Char";
 module {
 
     public func generateRandomID(name : Text) : async Text {
-        var n : Text = name;
         let entropy = await Random.blob();
         var f = Random.Finite(entropy);
-        let count : Nat = 2;
-        var i = 1;
+        let count : Nat = 8; // Generate 8 random bytes
+        var id = "";
+        var i = 0;
         label l loop {
             if (i >= count) break l;
             let b = f.byte();
             switch (b) {
-                case (?byte) { n := n # Nat8.toText(byte); i += 1 };
+                case (?byte) {
+                    // Convert byte to hex string (0-9, a-f)
+                    let hex = toHex(Nat32.fromNat(Nat8.toNat(byte)));
+                    id := id # hex;
+                    i += 1;
+                };
                 case null {
                     let entropy = await Random.blob();
                     f := Random.Finite(entropy);
                 };
             };
         };
-        n;
+        // Prefix with first 4 chars of name (sanitized) and underscore
+        let prefix = sliceText(name, 0, Nat.min(4, name.size()));
+        prefix # "_" # id;
     };
 
     public func sliceText(text : Text, start : Nat, end : Nat) : Text {

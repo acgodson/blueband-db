@@ -1,75 +1,109 @@
-import Buckets "./bucket/Bucket";
+//bluebandprovider.mo
+import Types "./Types";
+import Principal "mo:base/Principal";
 
-module BluebandProvider {
-
-    public type Bucket = Buckets.Bucket;
-    public type CollectionId = Text;
-    public type DocumentId = Text;
-    public type VectorId = Text;
-    public type Title = Text;
-    public type Content = Text;
-
-    public type DocumentMetadata = {
-        id : DocumentId;
-        title : Title;
-        chunkCount : Nat;
-        totalSize : Nat;
-        isEmbedded : Bool;
-    };
-
-    public type Vector = {
-        id : VectorId;
-        documentId : DocumentId;
-        start : Nat;
-        end : Nat;
-        embedding : [Float];
-    };
-
-    public type Collection = {
-        bucket : Bucket;
-        var size : Nat;
-        var cycle_balance : Nat;
-    };
-
-    public type VectorStore = [Vector];
-    public type MetadataList = [DocumentMetadata];
-
-    public type BluebandProvider = actor {
-
-        index : (collectionId : CollectionId) -> async ?{
-            items : VectorStore;
+module {
+    type CollectionId = Types.CollectionId;
+    type DocumentId = Types.DocumentId;
+    type ChunkId = Types.ChunkId;
+    type VectorId = Types.VectorId;
+    type Vector = Types.Vector;
+    type DocumentMetadata = Types.DocumentMetadata;
+    type SemanticChunk = Types.SemanticChunk;
+    type ProposalId = Types.ProposalId;
+    type ProposalStatus = Types.ProposalStatus;
+    type DocumentProposal = Types.DocumentProposal;
+    type EmbeddingsResponse = {
+        #success : {
+            raw_response : Text;
         };
+        #rate_limited : Text;
+        #error : Text;
+    };
+    type TransformArgs = {
+        response : {
+            status : Nat;
+            headers : [{ name : Text; value : Text }];
+            body : [Nat8];
+        };
+        context : Blob;
+    };
+    type HttpResponsePayload = {
+        status : Nat;
+        headers : [{ name : Text; value : Text }];
+        body : [Nat8];
+    };
 
-        addDocument : (collectionId : CollectionId, title : Title, content : Content) -> async ?({
+    // Define the public interface for the Blueband service
+    public type BluebandProvider = actor {
+        // Collection Management
+        createCollection : (
+            collectionId : Text,
+            token_canister : ?Principal,
+            voting_threshold : ?Nat,
+            quorum_threshold : ?Nat,
+            expiry_time : ?Nat,
+        ) -> async ?Principal;
+
+        // Admin Management
+        addCollectionAdmin : (collectionId : Text, newAdmin : Principal) -> async Bool;
+        removeCollectionAdmin : (collectionId : Text, adminToRemove : Principal) -> async Bool;
+        isCollectionAdmin : query (collectionId : Text) -> async Bool;
+
+        // Document Management
+        addDocument : (collectionId : Text, title : Text, content : Text) -> async ?{
             collection : ?Principal;
             documentId : ?DocumentId;
-        });
+        };
+        getDocumentContent : (collectionId : Text, documentId : Text) -> async ?Text;
+        getDocumentChunks : (collectionId : Text, documentId : Text) -> async ?[SemanticChunk];
 
-        putVector : (
-            collectionId : CollectionId,
-            documentId : DocumentId,
-            vectorId : VectorId,
-            start : Nat,
-            end : Nat,
-            vector : [Float],
-        ) -> async Text;
+        // Vector Operations
+        addVector : (
+            collectionId : Text,
+            documentId : Text,
+            chunkId : Text,
+            vectorId : Text,
+            embedding : [Float],
+            norm : Float,
+        ) -> async ?Text;
+        completeEmbedding : (collectionId : Text, documentId : Text) -> async Bool;
 
-        endUpdate : (collectionId : CollectionId, documentId : DocumentId) -> async ();
+        // Governance
+        createEmbeddingProposal : (collectionId : Text, documentId : Text, description : ?Text) -> async ?ProposalId;
+        voteOnProposal : (proposalId : Text, inFavor : Bool) -> async Bool;
+        getProposal : query (proposalId : Text) -> async ?DocumentProposal;
+        listProposals : query (collectionId : Text, status : ?ProposalStatus) -> async [DocumentProposal];
 
-        getCollectionPrincipal : (collectionId : CollectionId) -> async ?Principal;
+        // Query Operations
+        getVectorIndex : (collectionId : Text) -> async ?{ items : [Vector] };
+        getDocumentList : (collectionId : Text) -> async ?[DocumentMetadata];
+        getDocumentMetadata : (collectionId : Text, documentId : Text) -> async ?DocumentMetadata;
+        getCollectionPrincipal : (collectionId : Text) -> async ?Principal;
+        queryVectorSimilarity : (
+            collectionId : Text,
+            queryText : Text,
+            limit : ?Nat,
+        ) -> async ?{
+            matches : [{
+                score : Float;
+                document_id : Text;
+                chunk_id : Text;
+                document_title : ?Text;
+                chunk_text : ?Text;
+            }];
+        };
 
-        getMetadataList : (collectionId : CollectionId) -> async ?MetadataList;
+        // Utility Functions
+        getDocumentIdFromVector : (collectionId : Text, vectorId : Text) -> async ?Text;
+        getDocumentTitle : (collectionId : Text, documentId : Text) -> async ?Text;
+        findDocumentByTitle : (collectionId : Text, title : Text) -> async ?Text;
 
-        getChunks : (collectionId : CollectionId, documentId : DocumentId) -> async ?Text;
+        // Embedding Operations
+        generateEmbeddings : (texts : [Text]) -> async EmbeddingsResponse;
+        transform : query (args : TransformArgs) -> async HttpResponsePayload;
 
-        getMetadata : (collectionId : CollectionId, documentId : DocumentId) -> async ?DocumentMetadata;
-
-        getDocumentId : (collectionId : CollectionId, vectorId : VectorId) -> async ?DocumentId;
-
-        documentIDToTitle : (collectionId : CollectionId, documentId : DocumentId) -> async ?Title;
-
-        titleToDocumentID : (collectionId : CollectionId, title : Title) -> async ?DocumentId;
-
+        // System Operations
         wallet_receive : () -> async ();
     };
 };

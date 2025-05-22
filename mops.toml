@@ -1,1 +1,8 @@
+[package]
+name = "blueband-db"
+version = "0.1.0"
+
 [dependencies]
+base = "0.14.0"
+map = "9.0.1"
+icrc1-types = "1.0.0"
