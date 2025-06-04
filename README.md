@@ -1,64 +1,130 @@
 # Blueband DB
 
-A vectra-inspired vector db on ICP. Blueband handles the complete document lifecycle - from text chunking and embedding to vector storage and similarity search - while leveraging ICP's stable memory for persistence. Its adaptive search algorithms and collection-based design make it particularly effective for applications requiring semantic understanding and scalable vector operations.
+An on-chain vector database built on the ICP for semantic search, similarity matching, and document retrieval
+
+- **`Semantic Document Processing`**: Intelligent text chunking with configurable overlap and embedding generation
+- **`Hierarchical Vector Indexing`**: K-means clustering for sub-linear search performance on large datasets
+- **`Embedding Support`**: OpenAI embeddings (Ada-002, 3-small, 3-large)
+- **`Collection-Based Architecture`**: Isolated namespaces with granular access controls and admin hierarchies
+- **`Adaptive Search Algorithm`**: Automatic switching between exact and approximate similarity search based on dataset size
+- **`Memory-Optimized Caching`**: LRU cache with bounded memory
 
 
-## 🚀 Quick Start
+
+## Installation
+
+### Add to your dfx.json (Recommended)
+
+Add Blueband to your project's `dfx.json` like Internet Identity:
+
+```json
+{
+  "canisters": {
+    "blueband_rust": {
+      "type": "custom",
+      "candid": "https://github.com/acgodson/blueband-db/releases/latest/download/blueband_rust.did",
+      "wasm": "https://github.com/acgodson/blueband-db/releases/latest/download/blueband_rust.wasm.gz"
+    },
+    "frontend": {
+      "source": ["src/frontend/dist"],
+      "type": "assets",
+      "dependencies": ["blueband_rust"]
+    }
+  }
+}
+```
+
+Then deploy:
+
+```bash
+dfx start --background
+dfx canister create blueband_rust
+dfx canister install blueband_rust
+```
+
+### Manual Installation
+
+```bash
+# Download and deploy directly
+wget https://github.com/acgodson/blueband-db/releases/download/v0.1.9/blueband_rust.wasm.gz
+gunzip blueband_rust.wasm.gz
+dfx canister install --mode install --wasm blueband_rust.wasm <canister-id>
+```
+
+
+### Usage
 
 ```typescript
-import { Actor, HttpAgent } from "@dfinity/agent";
-import { Principal } from "@dfinity/principal";
-import { Ed25519KeyIdentity } from "@dfinity/identity";
-import { idlFactory } from "./declarations/blueband_rust.did.js";
-
-
-const identity = Ed25519KeyIdentity.generate();
-const agent = new HttpAgent({
-  host: "http://127.0.0.1:4943", 
-  identity,
-});
-
-const actor = Actor.createActor(idlFactory, {
-  agent,
-  canisterId: Principal.fromText("canister-id"),
-});
 
 // Example: Simple semantic search
+
 const docs = [
   "Pizza is a delicious Italian food with cheese and tomatoes",
-  "Soccer is the most popular sport in the world",
+  "Soccer is the most popular sport in the world", 
   "JavaScript is a programming language for web development",
 ];
 
-const query =  "Which sport is most popular?";
+const query = "Which sport is most popular?";
 
-// Search with 91%+ accuracy
 const results = await actor.demo_vector_similarity(
   docs,
   query,
-  "openai-embedding-proxy-url",
-  [1], // Return top result
+  "<openai-embedding-proxy-url>",
+  [1], // Only return top result
   []
 );
 
-// Results:
-// ✅ [91.1%] Soccer is the most popular sport in the world
+console.log(results);
+// Returns: [{ score: 0.91, text: "Soccer is the most popular sport in the world", ... }]
 ```
 
-## 🔧 Installing pre-built cannister
+## Operations
 
-```bash
-wget http://github.com/acgodson/blueband/
+### Collection Management
+```typescript
+// Create isolated space
+await actor.create_collection(config);
+
+// Manage access controls
+await actor.add_collection_admin(collection_id, principal);
+await actor.transfer_genesis_admin(collection_id, new_admin);
 ```
 
-## 📚 Documentation
+### Document Operations
+```typescript
+// Store document only
+await actor.add_document(documentRequest);
 
-For detailed API documentation and advanced usage, see our [technical documentation](docs.md).
+// Add with automatic embedding
+await actor.add_document_and_embed(documentRequest, proxy_url);
 
-## 🤝 Contributing
+// Retrieve with metadata
+const doc = await actor.get_document(collection_id, document_id);
+```
 
-We welcome contributions! Please see our contributing guidelines for more details.
+### Vector Search
+```typescript
+// Semantic similarity search
+const matches = await actor.search(query_config);
 
-## 📄 License
+// Document-to-document similarity  
+const similar = await actor.find_similar_documents(source_id, collection_id, config);
+```
 
-MIT License - see LICENSE file for details
+## Use Cases
+
+- **`Enterprise Search`**: Intelligent document retrieval across knowledge bases
+- **`Recommendation Systems`**: Content similarity for personalized suggestions  
+- **`Research Platforms`**: Semantic paper discovery and citation analysis
+
+
+## Documentation
+
+- [API Reference](docs/api.md) - Operations documentation
+
+
+
+## License
+
+-  [MIT](LICENSE)
+
