@@ -1,0 +1,186 @@
+type AddDocumentRequest = record {
+  title : text;
+  content : text;
+  content_type : opt ContentType;
+  collection_id : text;
+  source_url : opt text;
+};
+type BulkEmbedResult = record {
+  skipped : nat32;
+  errors : vec text;
+  embedded : nat32;
+  failed : nat32;
+};
+type CacheStats = record {
+  memory_usage_percent : nat32;
+  max_entries : nat64;
+  max_memory_bytes : nat64;
+  entry_count : nat64;
+  total_memory_bytes : nat64;
+};
+type Collection = record {
+  id : text;
+  updated_at : nat64;
+  genesis_admin : text;
+  name : text;
+  description : opt text;
+  created_at : nat64;
+  settings : CollectionSettings;
+  admins : vec text;
+};
+type CollectionSettings = record {
+  chunk_overlap : nat32;
+  max_documents : opt nat32;
+  embedding_model : text;
+  auto_embed : bool;
+  proxy_url : text;
+  chunk_size : nat32;
+};
+type CollectionStats = record {
+  updated_at : nat64;
+  document_count : nat32;
+  created_at : nat64;
+  vector_count : nat32;
+};
+type CollectionWithStats = record {
+  collection : Collection;
+  stats : CollectionStats;
+};
+type ContentType = variant { Pdf; Html; PlainText; Markdown; Other : text };
+type CreateCollectionRequest = record {
+  id : text;
+  name : text;
+  description : opt text;
+  settings : opt CollectionSettings;
+};
+type DocumentMetadata = record {
+  id : text;
+  total_chunks : nat32;
+  title : text;
+  size : nat64;
+  content_type : ContentType;
+  collection_id : text;
+  is_embedded : bool;
+  source_url : opt text;
+  timestamp : nat64;
+  checksum : text;
+};
+type HttpHeader = record { value : text; name : text };
+type HttpResponse = record {
+  status : nat;
+  body : blob;
+  headers : vec HttpHeader;
+};
+type MemorySearchResult = record {
+  document_id : text;
+  "text" : text;
+  chunk_id : text;
+  score : float64;
+};
+type MemoryStats = record {
+  used_pages : nat64;
+  total_pages : nat64;
+  total_bytes : nat64;
+  available_bytes : nat64;
+};
+type Result = variant { Ok; Err : text };
+type Result_1 = variant { Ok : DocumentMetadata; Err : text };
+type Result_2 = variant { Ok : vec vec VectorMatch; Err : text };
+type Result_3 = variant { Ok : BulkEmbedResult; Err : text };
+type Result_4 = variant { Ok : Collection; Err : text };
+type Result_5 = variant { Ok : vec MemorySearchResult; Err : text };
+type Result_6 = variant { Ok : nat32; Err : text };
+type Result_7 = variant { Ok : vec VectorMatch; Err : text };
+type Result_8 = variant { Ok : vec text; Err : text };
+type SearchRequest = record {
+  collection_id : text;
+  "query" : text;
+  limit : opt nat32;
+  filter : opt text;
+  min_score : opt float64;
+};
+type SemanticChunk = record {
+  id : text;
+  document_id : text;
+  "text" : text;
+  token_count : opt nat32;
+  char_end : nat64;
+  char_start : nat64;
+  position : nat32;
+};
+type TransformArgs = record { context : blob; response : HttpResponse };
+type Vector = record {
+  id : text;
+  model : text;
+  document_id : text;
+  norm : float32;
+  chunk_id : text;
+  created_at : nat64;
+  embedding : vec float32;
+};
+type VectorMatch = record {
+  document_id : text;
+  document_title : opt text;
+  chunk_id : text;
+  score : float64;
+  chunk_text : opt text;
+};
+service : () -> {
+  add_collection_admin : (text, text) -> (Result);
+  add_document : (AddDocumentRequest) -> (Result_1);
+  add_document_and_embed : (AddDocumentRequest, text) -> (Result_1);
+  batch_similarity_search : (vec text, text, opt nat32, opt float64) -> (
+      Result_2,
+    );
+  bulk_embed_collection : (text) -> (Result_3);
+  cleanup_cache : () -> (nat32);
+  clear_cache : () -> ();
+  clear_collection_vectors : (text) -> (Result);
+  create_collection : (CreateCollectionRequest) -> (Result_4);
+  delete_collection : (text) -> (Result);
+  delete_collection_documents : (text) -> (Result);
+  delete_document : (text, text) -> (Result);
+  delete_document_vectors : (text, text) -> (Result);
+  delete_vector : (text) -> (Result);
+  demo_vector_similarity : (vec text, text, text, opt nat32, opt float64) -> (
+      Result_5,
+    );
+  embed_existing_document : (text, text) -> (Result_6);
+  find_similar_documents : (text, text, opt nat32, opt float64) -> (
+      Result_7,
+    ) query;
+  get_cache_stats : () -> (CacheStats) query;
+  get_canister_cycles : () -> (nat64) query;
+  get_collection : (text) -> (opt Collection) query;
+  get_collection_documents : (text) -> (vec DocumentMetadata) query;
+  get_collection_embedding_dimensions : (text) -> (opt nat32) query;
+  get_collection_with_stats : (text) -> (opt CollectionWithStats) query;
+  get_config : (text) -> (opt text) query;
+  get_document : (text, text) -> (opt DocumentMetadata) query;
+  get_document_chunks : (text) -> (vec SemanticChunk) query;
+  get_document_content : (text, text) -> (opt text) query;
+  get_document_count : (text) -> (nat64) query;
+  get_genesis_admin : (text) -> (opt text) query;
+  get_memory_stats : () -> (MemoryStats) query;
+  get_my_admin_level : (text) -> (text) query;
+  get_storage_stats : () -> (nat64, nat64, nat64, nat64) query;
+  get_vector : (text) -> (opt Vector) query;
+  get_vector_count : (text) -> (nat64) query;
+  invalidate_collection_cache : (text) -> ();
+  is_collection_admin : (text, text) -> (bool) query;
+  list_collection_admins : (text) -> (Result_8) query;
+  list_collections : () -> (vec Collection) query;
+  list_collections_with_stats : () -> (vec CollectionWithStats) query;
+  list_documents : (text) -> (vec DocumentMetadata) query;
+  remove_collection_admin : (text, text) -> (Result);
+  search : (SearchRequest) -> (Result_5);
+  search_filtered : (SearchRequest) -> (Result_5);
+  set_config : (text, text) -> (Result);
+  store_document_chunks : (text, vec SemanticChunk) -> (Result);
+  transfer_genesis_admin : (text, text) -> (Result);
+  transform_embedding_response : (TransformArgs) -> (HttpResponse) query;
+  update_collection_metadata : (text, opt text, opt text) -> (Result);
+  update_collection_settings : (text, CollectionSettings) -> (Result);
+  validate_collection_vectors : (text) -> (vec text);
+  wallet_receive : () -> (nat64);
+}

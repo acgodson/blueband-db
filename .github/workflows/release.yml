@@ -63,11 +63,6 @@ jobs:
         with:
           dfx-version: "0.15.1"
 
-      - name: Install didc (Candid compiler)
-        run: |
-          # Install didc for Candid interface extraction
-          cargo install didc --version 0.3.6 || echo "didc install failed, will rely on dfx build"
-
       - name: Confirm dfx installation
         run: dfx --version
 
@@ -94,56 +89,45 @@ jobs:
           # Ensure dependencies are up to date
           cargo update
 
-      - name: Generate Candid interface
+      - name: Verify Candid interface exists
         run: |
-          echo "Generating Candid interface..."
-          # First build the WASM canister to generate the DID file
-          dfx start --background --clean
-          sleep 5
-          dfx canister create --all
-
-          # Build without --locked flag to allow lock file generation
-          RUST_LOG=info dfx build blueband_rust || {
-            echo "Build failed, trying with cargo directly..."
-            cargo build --target wasm32-unknown-unknown --release -p blueband_rust
-            # Manual build completion steps if needed
-          }
-
-          # Extract the DID file from the build
-          if [ -f ".dfx/local/canisters/blueband_rust/blueband_rust.did" ]; then
-            cp .dfx/local/canisters/blueband_rust/blueband_rust.did ./blueband_rust.did
-            echo "Generated Candid interface from dfx build:"
+          echo "Checking for committed Candid interface..."
+          if [ -f "blueband_rust.did" ]; then
+            echo "✅ Found committed blueband_rust.did file"
+            echo "Candid interface content:"
             cat blueband_rust.did
+            echo ""
+            echo "File size: $(wc -c < blueband_rust.did) bytes"
           else
-            echo "Warning: DID file not found from dfx build, trying alternative method..."
-            # Alternative: Use didc to extract from WASM if available
-            if command -v didc &> /dev/null && [ -f ".dfx/local/canisters/blueband_rust/blueband_rust.wasm" ]; then
-              didc bind .dfx/local/canisters/blueband_rust/blueband_rust.wasm > blueband_rust.did
-              echo "Generated Candid interface using didc:"
-              cat blueband_rust.did
-            else
-              echo "Error: Cannot generate Candid interface"
-              exit 1
-            fi
+            echo "❌ Error: blueband_rust.did file not found in repository"
+            echo "Please commit your blueband_rust.did file to the repository"
+            exit 1
           fi
 
       - name: Validate Candid interface
         run: |
-          # Check if the DID file was generated and is not empty
-          if [ ! -s blueband_rust.did ]; then
-            echo "Error: Candid interface file is empty or not generated"
-            exit 1
-          fi
-
           # Basic validation - check if it contains service definition
           if ! grep -q "service" blueband_rust.did; then
-            echo "Warning: Candid file might be incomplete - no service definition found"
+            echo "❌ Warning: Candid file might be incomplete - no service definition found"
+            echo "First 10 lines of the file:"
+            head -10 blueband_rust.did
+          else
+            echo "✅ Candid interface validation passed"
           fi
 
-      - name: Create and build canister
+      - name: Start dfx and build canister
         run: |
-          echo "Canister already built during Candid generation"
-          echo "Verifying build artifacts..."
+          echo "Starting dfx..."
+          dfx start --background --clean
+          sleep 5
+
+          echo "Creating canister..."
+          dfx canister create --all
+
+          echo "Building canister..."
+          RUST_LOG=info dfx build blueband_rust
+
+          echo "Build completed successfully"
 
       - name: Verify build artifacts
         run: |
@@ -171,12 +155,7 @@ jobs:
           cp .dfx/local/canisters/blueband_rust/blueband_rust.wasm ./blueband_rust.wasm
           gzip -c ./blueband_rust.wasm > ./blueband_rust.wasm.gz
 
-          # Ensure DID file is in root (should already be there from generation step)
-          if [ ! -f "./blueband_rust.did" ]; then
-            echo "Error: DID file not found in root directory"
-            exit 1
-          fi
-
+          # DID file is already in root directory from repository
           echo "Release artifacts prepared:"
           ls -la blueband_rust.wasm*
           ls -la blueband_rust.did
