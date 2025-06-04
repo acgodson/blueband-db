@@ -2,7 +2,7 @@
 name = "blueband_rust"
 version = "0.1.0"
 edition = "2021"
-description = "Blueband Vector Database - Rust Implementation with Stable Storage"
+description = "Blueband Vector DB - Rust Implementation with Stable Storage"
 
 [lib]
 name = "blueband_rust"        
