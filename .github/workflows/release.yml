@@ -191,29 +191,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: v${{ needs.check-version.outputs.new-version }}
-          release_name: Blueband Vector Database v${{ needs.check-version.outputs.new-version }}
+          release_name: Blueband db v${{ needs.check-version.outputs.new-version }}
           body: |
-            ## Blueband Vector Database v${{ needs.check-version.outputs.new-version }}
+            ## Blueband vector db v${{ needs.check-version.outputs.new-version }}
 
-            ### 🚀 Features
-            - Production-ready vector database canister built in Rust
-            - Advanced similarity search with hierarchical indexing
-            - OpenAI embedding model support (Ada-002, 3-small, 3-large)
+            ### Features
+            - Similarity search with hierarchical indexing
+            - OpenAI embeddings support (Ada-002, 3-small, 3-large)
             - Semantic document chunking and vector storage
             - Collection-based organization with admin controls
-            - Optimized performance with LRU caching
+            - LRU caching
 
-            ### 📦 Release Artifacts
+            ### Release Artifacts
             - `blueband_rust.wasm.gz` - Compressed WebAssembly canister
             - `blueband_rust.did` - Candid interface definition
-
-            ### 🔧 Installation
-            ```bash
-            # Download and deploy
-            wget https://github.com/${{ github.repository }}/releases/download/v${{ needs.check-version.outputs.new-version }}/blueband_rust.wasm.gz
-            gunzip blueband_rust.wasm.gz
-            dfx canister install --mode install --wasm blueband_rust.wasm <canister-id>
-            ```
 
             Built from commit: ${{ github.sha }}
           draft: false
