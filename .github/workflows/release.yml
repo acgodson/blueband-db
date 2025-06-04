@@ -82,6 +82,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
+      - name: Generate Cargo.lock if missing
+        run: |
+          if [ ! -f "Cargo.lock" ]; then
+            echo "Generating Cargo.lock file..."
+            cargo generate-lockfile
+          else
+            echo "Cargo.lock already exists"
+          fi
+
+          # Ensure dependencies are up to date
+          cargo update
+
       - name: Generate Candid interface
         run: |
           echo "Generating Candid interface..."
@@ -89,7 +101,13 @@ jobs:
           dfx start --background --clean
           sleep 5
           dfx canister create --all
-          dfx build blueband_rust
+
+          # Build without --locked flag to allow lock file generation
+          RUST_LOG=info dfx build blueband_rust || {
+            echo "Build failed, trying with cargo directly..."
+            cargo build --target wasm32-unknown-unknown --release -p blueband_rust
+            # Manual build completion steps if needed
+          }
 
           # Extract the DID file from the build
           if [ -f ".dfx/local/canisters/blueband_rust/blueband_rust.did" ]; then
@@ -99,8 +117,10 @@ jobs:
           else
             echo "Warning: DID file not found from dfx build, trying alternative method..."
             # Alternative: Use didc to extract from WASM if available
-            if command -v didc &> /dev/null; then
+            if command -v didc &> /dev/null && [ -f ".dfx/local/canisters/blueband_rust/blueband_rust.wasm" ]; then
               didc bind .dfx/local/canisters/blueband_rust/blueband_rust.wasm > blueband_rust.did
+              echo "Generated Candid interface using didc:"
+              cat blueband_rust.did
             else
               echo "Error: Cannot generate Candid interface"
               exit 1
