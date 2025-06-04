@@ -1,0 +1,134 @@
+/* Sidebar Styling */
+.sidebar {
+    background-color: #ffffff;
+    border-right: 1px solid #e9ecef;
+}
+
+/* Main Title - Minimal styling */
+.sidebar .app-name {
+    padding: 10px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.sidebar .app-name-link {
+    font-size: 1.1em;
+    font-weight: normal;
+    color: #2c3e50;
+}
+
+/* Navigation Sections */
+.sidebar-nav {
+    padding: 8px 0;
+}
+
+/* Section Headers */
+.sidebar-nav h2 {
+    font-size: 0.95em;
+    font-weight: 600;
+    color: #2c3e50;
+    padding: 6px 15px;
+    margin: 0;
+    background-color: #f8f9fa;
+    border-left: 2px solid #42b983;
+}
+
+/* Navigation Links */
+.sidebar-nav ul li a {
+    color: #495057;
+    padding: 4px 15px 4px 25px;
+    display: block;
+    transition: all 0.2s ease;
+    border-left: 2px solid transparent;
+    position: relative;
+    font-size: 0.9em;
+}
+
+/* Active Link */
+.sidebar-nav ul li.active > a {
+    color: #42b983;
+    background-color: #f8f9fa;
+    border-left-color: #42b983;
+    font-weight: 500;
+}
+
+/* Hover Effect */
+.sidebar-nav ul li a:hover {
+    color: #42b983;
+    background-color: #f8f9fa;
+    border-left-color: #42b983;
+}
+
+/* Nested Items */
+.sidebar-nav ul li ul {
+    border-left: 1px dashed #e9ecef;
+    margin-left: 10px;
+    background-color: #f8f9fa;
+}
+
+.sidebar-nav ul li ul li a {
+    padding-left: 35px;
+    font-size: 0.85em;
+}
+
+/* Section Dividers */
+.sidebar-nav h2 + ul {
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+}
+
+/* Home Link Special Styling */
+.sidebar-nav ul li:first-child a {
+    font-weight: normal;
+    color: #2c3e50;
+    border-bottom: none;
+    margin-bottom: 6px;
+}
+
+/* Quick Start Link Special Styling */
+.sidebar-nav ul li:nth-child(2) a {
+    font-weight: normal;
+    color: #2c3e50;
+    background-color: transparent;
+    border-left-color: transparent;
+    margin-bottom: 10px;
+}
+
+/* Collapsible Indicators */
+.sidebar-nav ul li.has-sub > a::after {
+    content: '▸';
+    position: absolute;
+    right: 10px;
+    transition: transform 0.2s ease;
+    font-size: 0.8em;
+    color: #42b983;
+}
+
+.sidebar-nav ul li.has-sub.open > a::after {
+    transform: rotate(90deg);
+}
+
+/* Current Section Highlight */
+.sidebar-nav ul li.current-section > a {
+    background-color: #f8f9fa;
+    border-left-color: #42b983;
+    font-weight: 500;
+}
+
+/* API Reference Section Special Styling */
+.sidebar-nav h2:contains("API Reference") {
+    background-color: #f8f9fa;
+    border-left-color: #42b983;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 100%;
+        position: relative;
+    }
+    
+    .sidebar-nav ul li a {
+        padding: 6px 15px;
+    }
+} 
