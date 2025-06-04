@@ -134,15 +134,19 @@ jobs:
           echo "Checking build artifacts..."
           ls -la .dfx/local/canisters/blueband_rust/
 
-          # Verify WASM file exists and has reasonable size
-          WASM_FILE=".dfx/local/canisters/blueband_rust/blueband_rust.wasm"
-          if [ ! -f "$WASM_FILE" ]; then
-            echo "Error: WASM file not found"
+          # Check for compressed WASM first
+          if [ -f ".dfx/local/canisters/blueband_rust/blueband_rust.wasm.gz" ]; then
+            echo "Found compressed WASM file"
+            WASM_SIZE=$(stat -f%z ".dfx/local/canisters/blueband_rust/blueband_rust.wasm.gz" 2>/dev/null || stat -c%s ".dfx/local/canisters/blueband_rust/blueband_rust.wasm.gz")
+            echo "Compressed WASM file size: $WASM_SIZE bytes"
+          elif [ -f ".dfx/local/canisters/blueband_rust/blueband_rust.wasm" ]; then
+            echo "Found uncompressed WASM file"
+            WASM_SIZE=$(stat -f%z ".dfx/local/canisters/blueband_rust/blueband_rust.wasm" 2>/dev/null || stat -c%s ".dfx/local/canisters/blueband_rust/blueband_rust.wasm")
+            echo "Uncompressed WASM file size: $WASM_SIZE bytes"
+          else
+            echo "Error: No WASM file found"
             exit 1
           fi
-
-          WASM_SIZE=$(stat -f%z "$WASM_FILE" 2>/dev/null || stat -c%s "$WASM_FILE")
-          echo "WASM file size: $WASM_SIZE bytes"
 
           if [ "$WASM_SIZE" -lt 1000 ]; then
             echo "Error: WASM file seems too small"
@@ -151,14 +155,34 @@ jobs:
 
       - name: Prepare release artifacts
         run: |
-          # Copy and compress WASM file
-          cp .dfx/local/canisters/blueband_rust/blueband_rust.wasm ./blueband_rust.wasm
-          gzip -c ./blueband_rust.wasm > ./blueband_rust.wasm.gz
+          # Handle both compressed and uncompressed WASM files
+          if [ -f ".dfx/local/canisters/blueband_rust/blueband_rust.wasm.gz" ]; then
+            echo "Using pre-compressed WASM file"
+            cp .dfx/local/canisters/blueband_rust/blueband_rust.wasm.gz ./blueband_rust.wasm.gz
+            
+            # Decompress to create uncompressed version too
+            gunzip -c ./blueband_rust.wasm.gz > ./blueband_rust.wasm
+            
+          elif [ -f ".dfx/local/canisters/blueband_rust/blueband_rust.wasm" ]; then
+            echo "Using uncompressed WASM file"
+            cp .dfx/local/canisters/blueband_rust/blueband_rust.wasm ./blueband_rust.wasm
+            
+            # Create compressed version
+            gzip -c ./blueband_rust.wasm > ./blueband_rust.wasm.gz
+          else
+            echo "Error: No WASM file found to prepare"
+            exit 1
+          fi
 
           # DID file is already in root directory from repository
           echo "Release artifacts prepared:"
           ls -la blueband_rust.wasm*
           ls -la blueband_rust.did
+
+          # Show file sizes
+          echo "File sizes:"
+          echo "Uncompressed WASM: $(stat -f%z blueband_rust.wasm 2>/dev/null || stat -c%s blueband_rust.wasm) bytes"
+          echo "Compressed WASM: $(stat -f%z blueband_rust.wasm.gz 2>/dev/null || stat -c%s blueband_rust.wasm.gz) bytes"
 
       - name: Create Release
         id: create_release
