@@ -1,71 +1,219 @@
-# name: Build and Release Canister
+name: Build and Release Rust Canister
 
-# on:
-#   push:
-#     tags:
-#       - "v*"
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Cargo.toml"
+      - "src/**"
+      - "dfx.json"
 
-# jobs:
-#   build-and-release:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v2
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version-changed: ${{ steps.check.outputs.changed }}
+      new-version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
-#       - name: Install dfx
-#         uses: dfinity/setup-dfx@main
-#         with:
-#           dfx-version: "0.15.1"
+      - name: Check if version changed
+        id: check
+        run: |
+          # Get current version from Cargo.toml
+          CURRENT_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "Current version: $CURRENT_VERSION"
 
-#       - name: Confirm dfx installation
-#         run: dfx --version
+          # Get previous version from the last commit
+          git checkout HEAD~1 -- Cargo.toml 2>/dev/null || echo "No previous Cargo.toml found"
+          PREVIOUS_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/' 2>/dev/null || echo "0.0.0")
+          echo "Previous version: $PREVIOUS_VERSION"
 
-#       - uses: ZenVoich/setup-mops@v1
+          # Restore current Cargo.toml
+          git checkout HEAD -- Cargo.toml
 
-#       - name: Ensure moc is installed
-#         run: mops toolchain use moc latest || mops toolchain install
+          # Check if version changed
+          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+            echo "Version changed from $PREVIOUS_VERSION to $CURRENT_VERSION"
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "Version unchanged"
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          fi
 
-#       - name: Add base
-#         run: mops add base
+  build-and-release:
+    needs: check-version
+    if: needs.check-version.outputs.version-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-#       - name: Add map
-#         run: mops add map
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
 
-#       - name: Build canister
-#         run: |
-#           dfx start --background
-#           dfx canister create --all
-#           dfx build
+      - name: Install dfx
+        uses: dfinity/setup-dfx@main
+        with:
+          dfx-version: "0.15.1"
 
-#       - name: Compress wasm
-#         run: gzip -c .dfx/local/canisters/blueband-db-backend/blueband-db-backend.wasm > ./blueband-db-backend.wasm.gz
+      - name: Confirm dfx installation
+        run: dfx --version
 
-#       - name: Create Release
-#         id: create_release
-#         uses: actions/create-release@v1
-#         env:
-#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#         with:
-#           tag_name: ${{ github.ref }}
-#           release_name: Release ${{ github.ref }}
-#           draft: false
-#           prerelease: false
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
-#       - name: Upload wasm.gz
-#         uses: actions/upload-release-asset@v1
-#         env:
-#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#         with:
-#           upload_url: ${{ steps.create_release.outputs.upload_url }}
-#           asset_path: ./blueband-db-backend.wasm.gz
-#           asset_name: blueband-db-backend.wasm.gz
-#           asset_content_type: application/gzip
+      - name: Generate Candid interface
+        run: |
+          echo "Generating Candid interface..."
+          cargo build --bin export --target wasm32-unknown-unknown --release
+          cargo run --bin export > blueband_rust.did
+          echo "Generated Candid interface:"
+          cat blueband_rust.did
 
-#       - name: Upload did
-#         uses: actions/upload-release-asset@v1
-#         env:
-#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#         with:
-#           upload_url: ${{ steps.create_release.outputs.upload_url }}
-#           asset_path: ./.dfx/local/canisters/blueband-db-backend/blueband-db-backend.did
-#           asset_name: blueband-db-backend.did
-#           asset_content_type: text/plain
+      - name: Validate Candid interface
+        run: |
+          # Check if the DID file was generated and is not empty
+          if [ ! -s blueband_rust.did ]; then
+            echo "Error: Candid interface file is empty or not generated"
+            exit 1
+          fi
+
+          # Basic validation - check if it contains service definition
+          if ! grep -q "service" blueband_rust.did; then
+            echo "Warning: Candid file might be incomplete - no service definition found"
+          fi
+
+      - name: Start dfx
+        run: |
+          dfx start --background --clean
+          sleep 5
+
+      - name: Create and build canister
+        run: |
+          echo "Creating canister..."
+          dfx canister create --all
+
+          echo "Building canister..."
+          dfx build blueband_rust
+
+          echo "Build completed successfully"
+
+      - name: Verify build artifacts
+        run: |
+          echo "Checking build artifacts..."
+          ls -la .dfx/local/canisters/blueband_rust/
+
+          # Verify WASM file exists and has reasonable size
+          WASM_FILE=".dfx/local/canisters/blueband_rust/blueband_rust.wasm"
+          if [ ! -f "$WASM_FILE" ]; then
+            echo "Error: WASM file not found"
+            exit 1
+          fi
+
+          WASM_SIZE=$(stat -f%z "$WASM_FILE" 2>/dev/null || stat -c%s "$WASM_FILE")
+          echo "WASM file size: $WASM_SIZE bytes"
+
+          if [ "$WASM_SIZE" -lt 1000 ]; then
+            echo "Error: WASM file seems too small"
+            exit 1
+          fi
+
+      - name: Prepare release artifacts
+        run: |
+          # Copy and compress WASM file
+          cp .dfx/local/canisters/blueband_rust/blueband_rust.wasm ./blueband_rust.wasm
+          gzip -c ./blueband_rust.wasm > ./blueband_rust.wasm.gz
+
+          # Ensure DID file is in root (should already be there from generation step)
+          if [ ! -f "./blueband_rust.did" ]; then
+            echo "Error: DID file not found in root directory"
+            exit 1
+          fi
+
+          echo "Release artifacts prepared:"
+          ls -la blueband_rust.wasm*
+          ls -la blueband_rust.did
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.check-version.outputs.new-version }}
+          release_name: Blueband Vector Database v${{ needs.check-version.outputs.new-version }}
+          body: |
+            ## Blueband Vector Database v${{ needs.check-version.outputs.new-version }}
+
+            ### 🚀 Features
+            - Production-ready vector database canister built in Rust
+            - Advanced similarity search with hierarchical indexing
+            - OpenAI embedding model support (Ada-002, 3-small, 3-large)
+            - Semantic document chunking and vector storage
+            - Collection-based organization with admin controls
+            - Optimized performance with LRU caching
+
+            ### 📦 Release Artifacts
+            - `blueband_rust.wasm.gz` - Compressed WebAssembly canister
+            - `blueband_rust.did` - Candid interface definition
+
+            ### 🔧 Installation
+            ```bash
+            # Download and deploy
+            wget https://github.com/${{ github.repository }}/releases/download/v${{ needs.check-version.outputs.new-version }}/blueband_rust.wasm.gz
+            gunzip blueband_rust.wasm.gz
+            dfx canister install --mode install --wasm blueband_rust.wasm <canister-id>
+            ```
+
+            Built from commit: ${{ github.sha }}
+          draft: false
+          prerelease: false
+
+      - name: Upload compressed WASM
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./blueband_rust.wasm.gz
+          asset_name: blueband_rust.wasm.gz
+          asset_content_type: application/gzip
+
+      - name: Upload uncompressed WASM
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./blueband_rust.wasm
+          asset_name: blueband_rust.wasm
+          asset_content_type: application/wasm
+
+      - name: Upload Candid interface
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./blueband_rust.did
+          asset_name: blueband_rust.did
+          asset_content_type: text/plain
+
+      - name: Stop dfx
+        if: always()
+        run: dfx stop

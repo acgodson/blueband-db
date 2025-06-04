@@ -1,50 +1,40 @@
 {
-  "canisters": {
-    "blueband-db": {
-      "main": "src/blueband-db/main.mo",
-      "type": "motoko"
-    },
-    "blueband-compute": {
-      "type": "custom",
-      "build": "(cd src/blueband-compute && cargo build --target wasm32-unknown-unknown --package blueband-compute --release)",
-      "candid": "src/blueband-compute/blueband_compute.did",
-      "wasm": "src/blueband-compute/target/wasm32-unknown-unknown/release/blueband_compute.wasm"
-    },
-    "test_token": {
-      "main": "src/test-token/main.mo",
-      "type": "motoko"
-    },
-    "internet_identity": {
-      "type": "custom",
-      "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
-      "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz",
-      "init_arg": "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}})",
-      "remote": {
-        "id": {
-          "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+    "canisters": {
+        "blueband_rust": {
+            "type": "rust",
+            "package": "blueband_rust",
+            "candid": "blueband_rust.did",
+            "build": [
+                "cargo build --target wasm32-unknown-unknown --release --package blueband_rust"
+            ],
+            "wasm": "target/wasm32-unknown-unknown/release/blueband_rust.wasm",
+            "gzip": true,
+            "declarations": {
+                "output": "declarations"
+            },
+            "metadata": [
+                {
+                    "name": "candid:service",
+                    "path": "blueband_rust.did"
+                }
+            ]
         }
-      },
-      "frontend": {}
     },
-    "frontend": {
-      "source": [
-        "src/clanopedia_frontend/dist"
-      ],
-      "type": "assets",
-      "dependencies": [
-        "blueband-db",
-        "blueband-compute",
-        "test_token",
-        "internet_identity"
-      ]
-    }
-  },
-  "defaults": {
-    "build": {
-      "packtool": "mops sources",
-      "args": ""
-    }
-  },
-  "output_env_file": ".env",
-  "version": 1
+    "networks": {
+        "local": {
+            "bind": "127.0.0.1:4943",
+            "type": "ephemeral",
+            "replica": {
+                "subnet_type": "system"
+            }
+        },
+        "ic": {
+            "providers": [
+                "https://icp0.io"
+            ],
+            "type": "persistent"
+        }
+    },
+    "output_env_file": ".env",
+    "version": 1
 }

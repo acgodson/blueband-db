@@ -1,18 +1,22 @@
 {
-  "engines": {
-    "node": ">=16.0.0",
-    "npm": ">=7.0.0"
-  },
-  "name": "clanopedia",
+  "name": "blueband-test",
+  "version": "1.0.0",
+  "description": "Test environment for Blueband vector search",
+  "main": "test.ts",
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "prebuild": "npm run prebuild --workspaces --if-present",
-    "pretest": "npm run prebuild --workspaces --if-present",
-    "start": "npm start --workspaces --if-present",
-    "test": "npm test --workspaces --if-present"
+    "test": "ts-node test.ts",
+    "build": "tsc"
   },
-  "type": "module",
-  "workspaces": [
-    "src/clanopedia_frontend"
-  ]
+  "dependencies": {
+    "@dfinity/agent": "^0.15.6",
+    "@dfinity/candid": "^0.15.6",
+    "@dfinity/identity": "^0.15.6",
+    "@dfinity/principal": "^0.15.6",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.2"
+  }
 }

@@ -1,29 +1,44 @@
-# Various IDEs and Editors
-.vscode/
-.idea/
-**/*~
-
-# Mac OSX temporary files
-.DS_Store
-**/.DS_Store
-
-# dfx temporary files
-.dfx/
-
-# generated files
-**/declarations/
-
-# rust
-target/
-
-# frontend code
+# Dependencies
 node_modules/
-dist/
-.svelte-kit/
+package-lock.json
+yarn.lock
 
-# environment variables
+# Rust specific
+/target/
+**/*.rs.bk
+Cargo.lock
+blueband_rust/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+
+# Environment files
 .env
+.env.local
+.env.*.local
 
-.mops
+# Build outputs
+/dist/
+/build/
+/declarations/
 
-src/blueband-db/http_Types.mo
+.dfx/
+blueband_rust.did
+
+docs.md
+advantage.md
+
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Coverage directory
+/coverage/
