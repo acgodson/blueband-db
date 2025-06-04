@@ -80,8 +80,10 @@ jobs:
       - name: Generate Candid interface
         run: |
           echo "Generating Candid interface..."
-          cargo build --bin export --target wasm32-unknown-unknown --release
-          cargo run --bin export > blueband_rust.did
+          # Build the export binary for native target (not WASM)
+          cargo build --bin export --release
+          # Run the export binary to generate DID file
+          ./target/release/export > blueband_rust.did
           echo "Generated Candid interface:"
           cat blueband_rust.did
 
