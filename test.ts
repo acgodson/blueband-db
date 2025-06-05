@@ -33,9 +33,7 @@ class SimpleTest {
   private proxyUrl: string;
 
   constructor() {
-    this.proxyUrl =
-      process.env.PROXY_URL ||
-      "";
+    this.proxyUrl = process.env.PROXY_URL || "";
 
     // Create agent with identity
     const identity = Ed25519KeyIdentity.generate();
@@ -50,7 +48,7 @@ class SimpleTest {
 
     this.actor = Actor.createActor(idlFactory, {
       agent: this.agent,
-      canisterId: Principal.fromText(process.env.CANISTER_ID || ""),
+      canisterId: Principal.fromText(process.env.CANISTER_ID),
     });
   }
 
