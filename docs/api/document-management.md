@@ -1,4 +1,4 @@
-# Document Management API
+# Document Management
 
 Document management functions handle the lifecycle of documents in a collection, including adding, retrieving, updating, and deleting documents and their chunks.
 
@@ -66,7 +66,9 @@ const result = await actor.add_document_and_embed({
 }, "https://your-proxy-url");
 ```
 
-## Get Document
+## Document Retrieval Methods
+
+### Get Document
 
 Retrieves document metadata and chunk information.
 
@@ -84,7 +86,7 @@ get_document(
 }>;
 ```
 
-## Get Document Content
+### Get Document Content
 
 Retrieves the full document content.
 
@@ -95,7 +97,7 @@ get_document_content(
 ): Promise<string>;
 ```
 
-## Get Document Chunks
+### Get Document Chunks
 
 Retrieves all chunks of a document with their metadata.
 
@@ -112,7 +114,9 @@ get_document_chunks(
 }>>;
 ```
 
-## Update Document
+## Document Update Methods
+
+### Update Document
 
 Updates document content and/or metadata. This will re-chunk the document.
 
@@ -142,7 +146,7 @@ await actor.update_document({
 });
 ```
 
-## Update Document Metadata
+### Update Document Metadata
 
 Updates only the document metadata without re-chunking.
 
@@ -154,7 +158,9 @@ update_document_metadata(
 ): Promise<void>;
 ```
 
-## Delete Document
+## Document Deletion Methods
+
+### Delete Document
 
 Removes a document and all its chunks and vectors.
 
@@ -165,7 +171,7 @@ delete_document(
 ): Promise<void>;
 ```
 
-## Embed Existing Document
+### Embed Existing Document
 
 Generates embeddings for an existing document's chunks.
 

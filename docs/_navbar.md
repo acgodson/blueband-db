@@ -1,4 +1,2 @@
-* [GitHub](https://github.com/yourusername/blueband-rust)
-* [Discord](https://discord.gg/your-discord)
-* [ICP Forum](https://forum.dfinity.org/)
-* [Report Issues](https://github.com/yourusername/blueband-rust/issues) 
+* [<img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" width="16" height="16" style="vertical-align: middle; margin-right: 4px;"> GitHub](https://github.com/acgodson/blueband-db)
+* [<img src="_images/icp.jpg" width="16" height="16" style="vertical-align: middle; margin-right: 4px;"> Forum](https://forum.dfinity.org/t/blueband-vector-database/33934) 

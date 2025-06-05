@@ -1,171 +1,95 @@
-# Collection Management API
+# Collection Management
 
-Collection management functions allow you to create, update, and manage vector collections with their associated permissions and settings.
+Collection management functions handle the lifecycle of collections, including creation, configuration, and access control.
 
 ## Create Collection
 
-Creates a new vector collection with admin permissions and configurable settings.
+Creates a new collection with specified settings.
 
 ```typescript
-create_collection(config: {
-    name: string;
-    description: string;
-    embedding_model: "openai-ada-002" | "openai-3-small" | "openai-3-large";
-    chunk_size: "small" | "medium" | "large";
-    chunk_overlap: number;
-}): Promise<{
+create_collection(params: {
     id: string;
     name: string;
-    description: string;
-    embedding_model: string;
-    chunk_size: string;
-    chunk_overlap: number;
-    created_at: bigint;
-    genesis_admin: string;
-}>;
+    description?: string;
+    settings?: CollectionSettings;
+}): Promise<Collection>;
 ```
 
 **Example:**
 ```typescript
 const collection = await actor.create_collection({
-    name: "my_collection",
-    description: "Collection for product descriptions",
-    embedding_model: "openai-ada-002",
-    chunk_size: "medium",
-    chunk_overlap: 100
-});
-```
-
-## Get Collection
-
-Retrieves collection metadata by ID.
-
-```typescript
-get_collection(collection_id: string): Promise<{
-    id: string;
-    name: string;
-    description: string;
-    embedding_model: string;
-    chunk_size: string;
-    chunk_overlap: number;
-    created_at: bigint;
-    genesis_admin: string;
-}>;
-```
-
-## List Collections
-
-Returns all collections without computed statistics.
-
-```typescript
-list_collections(): Promise<Array<{
-    id: string;
-    name: string;
-    description: string;
-    embedding_model: string;
-    chunk_size: string;
-    chunk_overlap: number;
-    created_at: bigint;
-    genesis_admin: string;
-}>>;
-```
-
-## Get Collection with Stats
-
-Returns collection with real-time document/vector counts.
-
-```typescript
-get_collection_with_stats(collection_id: string): Promise<{
-    collection: {
-        id: string;
-        name: string;
-        description: string;
-        embedding_model: string;
-        chunk_size: string;
-        chunk_overlap: number;
-        created_at: bigint;
-        genesis_admin: string;
-    };
-    stats: {
-        document_count: number;
-        vector_count: number;
-        chunk_count: number;
-        last_updated: bigint;
-    };
-}>;
-```
-
-## List Collections with Stats
-
-Returns all collections with computed statistics.
-
-```typescript
-list_collections_with_stats(): Promise<Array<{
-    collection: {
-        id: string;
-        name: string;
-        description: string;
-        embedding_model: string;
-        chunk_size: string;
-        chunk_overlap: number;
-        created_at: bigint;
-        genesis_admin: string;
-    };
-    stats: {
-        document_count: number;
-        vector_count: number;
-        chunk_count: number;
-        last_updated: bigint;
-    };
-}>>;
-```
-
-## Update Collection Settings
-
-Modifies embedding model, chunk size, and other collection parameters.
-
-```typescript
-update_collection_settings(
-    collection_id: string,
+    id: "research_papers",
+    name: "Research Papers",
+    description: "Collection of academic research papers",
     settings: {
-        embedding_model?: "openai-ada-002" | "openai-3-small" | "openai-3-large";
-        chunk_size?: "small" | "medium" | "large";
-        chunk_overlap?: number;
+        embedding_model: "text-embedding-3-small",
+        chunk_size: 1000,
+        chunk_overlap: 200,
+        auto_embed: true
     }
-): Promise<void>;
-```
-
-**Example:**
-```typescript
-await actor.update_collection_settings(collection.id, {
-    chunk_size: "large",
-    chunk_overlap: 200
 });
 ```
 
-## Update Collection Metadata
+## Collection Management Methods
 
-Changes collection name and description.
+### Get Collection
+
+Retrieves collection metadata and settings.
+
+```typescript
+get_collection(collection_id: string): Promise<Collection>;
+```
+
+### List Collections
+
+Returns all collections with their metadata.
+
+```typescript
+list_collections(): Promise<Array<Collection>>;
+```
+
+### Get Collection with Stats
+
+Returns collection metadata along with usage statistics.
+
+```typescript
+get_collection_with_stats(collection_id: string): Promise<CollectionWithStats>;
+```
+
+### List Collections with Stats
+
+Returns all collections with their usage statistics.
+
+```typescript
+list_collections_with_stats(): Promise<Array<CollectionWithStats>>;
+```
+
+### Update Collection
+
+Updates collection metadata and settings.
 
 ```typescript
 update_collection_metadata(
     collection_id: string,
-    metadata: {
-        name?: string;
-        description?: string;
-    }
+    name?: string,
+    description?: string
+): Promise<void>;
+
+update_collection_settings(
+    collection_id: string,
+    settings: CollectionSettings
 ): Promise<void>;
 ```
 
-## Delete Collection
+### Delete Collection
 
-Removes collection and all associated data. Only the genesis admin can delete a collection.
+Removes a collection and all its documents and vectors.
 
 ```typescript
 delete_collection(collection_id: string): Promise<void>;
 ```
 
-## Admin Management
+## Access Control Methods
 
 ### Add Collection Admin
 

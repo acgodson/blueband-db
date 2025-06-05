@@ -15,6 +15,102 @@
             --theme-color: #42b983;
             --code-bg-color: #f8f8f8;
             --code-color: #476582;
+            --toc-width: 280px;
+        }
+
+        /* Content area */
+        .markdown-section {
+            max-width: 900px;
+            padding: 2rem;
+            margin: 0 auto;
+        }
+
+        /* Right panel TOC */
+        .app-nav + .sidebar + .content {
+            margin-right: var(--toc-width);
+        }
+
+        .markdown-section {
+            margin-right: var(--toc-width);
+        }
+
+        .sidebar-nav ul li ul {
+            display: none !important;
+        }
+
+        /* TOC styling */
+        .page_toc {
+            position: fixed !important;
+            top: 60px !important;
+            right: 0 !important;
+            width: var(--toc-width) !important;
+            height: calc(100vh - 60px) !important;
+            overflow-y: auto !important;
+            padding: 1rem !important;
+            background: #fff !important;
+            border-left: 1px solid #eaecef !important;
+            font-size: 0.9rem !important;
+            z-index: 100 !important;
+        }
+
+        .page_toc .title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--theme-color);
+        }
+
+        .page_toc ul {
+            list-style: none !important;
+            padding-left: 0 !important;
+            margin: 0 !important;
+        }
+
+        .page_toc li {
+            margin: 0.3rem 0 !important;
+            padding-left: 1rem !important;
+            position: relative !important;
+        }
+
+        .page_toc a {
+            color: #2c3e50 !important;
+            text-decoration: none !important;
+            display: block !important;
+            padding: 0.2rem 0 !important;
+            transition: all 0.3s ease !important;
+            border-left: 2px solid transparent !important;
+            padding-left: 0.5rem !important;
+        }
+
+        .page_toc a:hover {
+            color: var(--theme-color) !important;
+            border-left-color: var(--theme-color) !important;
+        }
+
+        .page_toc .active {
+            color: var(--theme-color) !important;
+            border-left-color: var(--theme-color) !important;
+            font-weight: 500 !important;
+        }
+
+        @media screen and (min-width: 1024px) {
+            .markdown-section {
+                margin-right: var(--toc-width);
+            }
+        }
+
+        @media screen and (max-width: 1023px) {
+            .page_toc {
+                display: none !important;
+            }
+            .markdown-section {
+                margin-right: 0;
+            }
+            .app-nav + .sidebar + .content {
+                margin-right: 0;
+            }
         }
 
         /* Code block styling */
@@ -160,9 +256,22 @@
     <script>
         window.$docsify = {
             repo: '',
+            basePath: '',
             loadSidebar: true,
             loadNavbar: true,
-            subMaxLevel: 3,
+            subMaxLevel: 0,
+            auto2top: true,
+            alias: {
+                '/.*/_sidebar.md': '/_sidebar.md'
+            },
+            pageToc: {
+                scope: '.markdown-section',
+                headings: 'h1, h2, h3, h4, h5, h6',
+                title: 'On This Page',
+                scrollTo: true,
+                scrollToOffset: 70,
+                target: '.page_toc'
+            },
             search: {
                 maxAge: 86400000,
                 paths: 'auto',
@@ -178,7 +287,6 @@
             plugins: [
                 function (hook) {
                     hook.beforeEach(function (content) {
-                        // Add edit link to each page
                         return content + '\n\n---\n\n' +
                             '<a href="https://github.com/yourusername/blueband-rust/edit/master/docs/' +
                             this.route.file + '" target="_blank">' +
@@ -188,9 +296,13 @@
             ]
         }
     </script>
+    <!-- Core -->
     <script src="//cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+    
+    <!-- Plugins -->
     <script src="//cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
     <script src="//cdn.jsdelivr.net/npm/docsify@4/lib/plugins/zoom-image.min.js"></script>
+    <script src="//cdn.jsdelivr.net/npm/docsify-plugin-page-toc"></script>
     <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-rust.min.js"></script>
     <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-typescript.min.js"></script>
     <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
