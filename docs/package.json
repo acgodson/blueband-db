@@ -1,7 +1,7 @@
 {
   "name": "blueband-docs",
   "version": "1.0.0",
-  "description": "Documentation for Blueband vector db",
+  "description": "Documentation for Blueband vector database",
   "scripts": {
     "start": "docsify serve",
     "build": "docsify generate .",
