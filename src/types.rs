@@ -161,6 +161,7 @@ pub struct SearchRequest {
     pub limit: Option<u32>,
     pub min_score: Option<f64>,
     pub filter: Option<String>,
+    pub use_approximate: Option<bool>,
 }
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]

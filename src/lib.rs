@@ -244,14 +244,14 @@ pub async fn search(request: SearchRequest) -> Result<Vec<MemorySearchResult>, S
     let model = parse_embedding_model(&collection.settings.embedding_model)?;
     let (query_embedding, _) = compute::embed_query_text(&request.query, model, proxy_url).await?;
     
-    // FIXED: Include new fields in SimilarityConfig
+    // Use request.use_approximate or default to true for backward compatibility
     let matches = cosine_similarity_search(
         &query_embedding,
         &request.collection_id,
         &SimilarityConfig {
             min_score: request.min_score,
             max_results: request.limit.unwrap_or(10),
-            use_approximate: true,    // Enable fast search by default
+            use_approximate: request.use_approximate.unwrap_or(true),    // Use request parameter
             candidate_factor: 3.0,    // Search 3x more candidates for accuracy
         }
     )?;

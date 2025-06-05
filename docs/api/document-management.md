@@ -1,292 +1,68 @@
-# Document Management
+# Document
 
-Document management functions handle the lifecycle of documents in a collection, including adding, retrieving, updating, and deleting documents and their chunks.
+A document in Blueband is a text-based content unit stored in a collection. Each document is automatically split into semantic chunks for efficient vector search. 
 
-## Add Document
-
-Adds a document to a collection without generating embeddings. The document will be chunked according to collection settings.
+## Document Structure
 
 ```typescript
-add_document(params: {
-    collection_id: string;
-    document_id: string;
-    content: string;
-    metadata?: Record<string, string>;  // Optional key-value pairs
-}): Promise<{
-    document_id: string;
-    chunk_count: number;
-    created_at: bigint;
-}>;
-```
+interface DocumentMetadata {
+    id: string;              // Unique document identifier
+    collection_id: string;   // Parent collection
+    title: string;           // Document title
+    content_type: ContentType; // PlainText, Markdown, Html, Pdf, or Other
+    source_url?: string;     // Optional source URL
+    timestamp: bigint;       // Creation timestamp
+    total_chunks: number;    // Number of semantic chunks
+    size: bigint;           // Content size in bytes
+    is_embedded: boolean;    // Whether vectors are generated
+    checksum: string;        // Content hash for integrity
+}
 
-**Example:**
-```typescript
-const result = await actor.add_document({
-    collection_id: "col_123",
-    document_id: "doc_456",
-    content: "This is a sample document that will be chunked automatically.",
-    metadata: {
-        author: "John Doe",
-        category: "example"
-    }
-});
-```
-
-## Add Document and Embed
-
-Adds a document, chunks it, and generates embeddings in one operation.
-
-```typescript
-add_document_and_embed(
-    params: {
-        collection_id: string;
-        document_id: string;
-        content: string;
-        metadata?: Record<string, string>;
-    },
-    proxy_url: string  // OpenAI embedding proxy URL
-): Promise<{
-    document_id: string;
-    chunk_count: number;
-    vector_count: number;
-    created_at: bigint;
-}>;
-```
-
-**Example:**
-```typescript
-const result = await actor.add_document_and_embed({
-    collection_id: "col_123",
-    document_id: "doc_456",
-    content: "This document will be chunked and embedded immediately.",
-    metadata: {
-        source: "web",
-        language: "en"
-    }
-}, "https://your-proxy-url");
-```
-
-## Document Retrieval Methods
-
-### Get Document
-
-Retrieves document metadata and chunk information.
-
-```typescript
-get_document(
-    collection_id: string,
-    document_id: string
-): Promise<{
-    document_id: string;
-    metadata: Record<string, string>;
-    chunk_count: number;
-    vector_count: number;
-    created_at: bigint;
-    updated_at: bigint;
-}>;
-```
-
-### Get Document Content
-
-Retrieves the full document content.
-
-```typescript
-get_document_content(
-    collection_id: string,
-    document_id: string
-): Promise<string>;
-```
-
-### Get Document Chunks
-
-Retrieves all chunks of a document with their metadata.
-
-```typescript
-get_document_chunks(
-    collection_id: string,
-    document_id: string
-): Promise<Array<{
-    chunk_id: string;
-    content: string;
-    metadata: Record<string, string>;
-    has_embedding: boolean;
-    created_at: bigint;
-}>>;
-```
-
-## Document Update Methods
-
-### Update Document
-
-Updates document content and/or metadata. This will re-chunk the document.
-
-```typescript
-update_document(params: {
-    collection_id: string;
-    document_id: string;
-    content?: string;
-    metadata?: Record<string, string>;
-}): Promise<{
-    document_id: string;
-    chunk_count: number;
-    updated_at: bigint;
-}>;
-```
-
-**Example:**
-```typescript
-await actor.update_document({
-    collection_id: "col_123",
-    document_id: "doc_456",
-    content: "Updated document content",
-    metadata: {
-        status: "revised",
-        updated_by: "Jane Smith"
-    }
-});
-```
-
-### Update Document Metadata
-
-Updates only the document metadata without re-chunking.
-
-```typescript
-update_document_metadata(
-    collection_id: string,
-    document_id: string,
-    metadata: Record<string, string>
-): Promise<void>;
-```
-
-## Document Deletion Methods
-
-### Delete Document
-
-Removes a document and all its chunks and vectors.
-
-```typescript
-delete_document(
-    collection_id: string,
-    document_id: string
-): Promise<void>;
-```
-
-### Embed Existing Document
-
-Generates embeddings for an existing document's chunks.
-
-```typescript
-embed_existing_document(
-    collection_id: string,
-    document_id: string,
-    proxy_url: string  // OpenAI embedding proxy URL
-): Promise<{
-    document_id: string;
-    vector_count: number;
-    updated_at: bigint;
-}>;
+type ContentType = 
+    | "PlainText"
+    | "Markdown"
+    | "Html"
+    | "Pdf"
+    | { Other: string };
 ```
 
 ## Document Operations
 
-### List Documents
+| Method                    | Description                    | Parameters                                                                 | Returns                       |
+| ------------------------- | ------------------------------ | -------------------------------------------------------------------------- | ----------------------------- |
+| `add_document`            | Add document without embedding | `{ collection_id, title, content, content_type?, source_url? }`            | `Promise<DocumentMetadata>`   |
+| `add_document_and_embed`  | Add and embed in one step      | `{ collection_id, title, content, content_type?, source_url? }, proxy_url` | `Promise<DocumentMetadata>`   |
+| `get_document`            | Get document metadata          | `collection_id: string, document_id: string`                               | `Promise<DocumentMetadata>`   |
+| `get_document_content`    | Get raw content                | `collection_id: string, document_id: string`                               | `Promise<string>`             |
+| `get_document_chunks`     | Get all chunks                 | `document_id: string`                                                      | `Promise<SemanticChunk[]>`    |
+| `list_documents`          | List collection documents      | `collection_id: string`                                                    | `Promise<DocumentMetadata[]>` |
+| `delete_document`         | Remove document and data       | `collection_id: string, document_id: string`                               | `Promise<void>`               |
+| `embed_existing_document` | Generate vectors               | `collection_id: string, document_id: string`                               | `Promise<number>`             |
 
-Returns all documents in a collection with their metadata.
-
-```typescript
-list_documents(
-    collection_id: string
-): Promise<Array<{
-    document_id: string;
-    metadata: Record<string, string>;
-    chunk_count: number;
-    vector_count: number;
-    created_at: bigint;
-    updated_at: bigint;
-}>>;
-```
-
-### Get Document Stats
-
-Returns document statistics including chunk and vector counts.
+## Chunk Structure
 
 ```typescript
-get_document_stats(
-    collection_id: string,
-    document_id: string
-): Promise<{
-    chunk_count: number;
-    vector_count: number;
-    created_at: bigint;
-    updated_at: bigint;
-    last_embedded_at?: bigint;
-}>;
-```
-
-### Batch Operations
-
-```typescript
-// Add multiple documents
-add_documents(
-    collection_id: string,
-    documents: Array<{
-        document_id: string;
-        content: string;
-        metadata?: Record<string, string>;
-    }>
-): Promise<Array<{
-    document_id: string;
-    chunk_count: number;
-    created_at: bigint;
-}>>;
-
-// Delete multiple documents
-delete_documents(
-    collection_id: string,
-    document_ids: Array<string>
-): Promise<void>;
+interface SemanticChunk {
+    id: string;           // Unique chunk identifier
+    document_id: string;  // Parent document
+    text: string;         // Chunk content
+    position: number;     // Order in document
+    char_start: bigint;   // Start position
+    char_end: bigint;     // End position
+    token_count?: number; // Estimated tokens
+}
 ```
 
 ## Error Handling
 
-All document management functions can return the following errors:
-
 ```typescript
 type DocumentError = {
     NotFound: string;           // Document not found
-    NotAuthorized: string;      // Caller lacks required permissions
-    InvalidInput: string;       // Invalid parameters provided
-    AlreadyExists: string;      // Document with same ID exists
-    EmbeddingError: string;     // Failed to generate embeddings
-    InvalidMetadata: string;    // Invalid metadata format
-    CollectionNotFound: string; // Collection does not exist
-    InvalidProxy: string;       // Invalid proxy URL
+    NotAuthorized: string;      // Caller lacks permissions
+    InvalidInput: string;       // Invalid parameters
+    AlreadyExists: string;      // Duplicate document
+    EmbeddingError: string;     // Vector generation failed
+    CollectionNotFound: string; // Parent collection missing
+    InvalidProxy: string;       // Invalid embedding proxy
 };
 ```
-
-## Best Practices
-
-1. **Document IDs**
-   - Use unique, descriptive IDs
-   - Consider using UUIDs for large collections
-   - Avoid special characters in IDs
-
-2. **Metadata Usage**
-   - Keep metadata keys consistent
-   - Use meaningful key names
-   - Consider metadata size limits
-
-3. **Content Management**
-   - Monitor document size
-   - Consider chunk size impact
-   - Plan for embedding generation
-
-4. **Batch Operations**
-   - Use batch operations for multiple documents
-   - Monitor memory usage during batches
-   - Handle partial failures appropriately
-
-5. **Embedding Generation**
-   - Use proxy URLs for embedding generation
-   - Monitor embedding costs
-   - Consider batching embedding requests 

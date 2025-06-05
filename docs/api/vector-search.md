@@ -1,162 +1,68 @@
 # Vector Search
 
-Vector search functions enable semantic similarity search across document collections using vector embeddings.
+Blueband uses hierarchical vector indexing and cosine similarity to enable smooth semantic search across document collections. 
 
-## Search
+## Search Algorithm
 
-Performs semantic similarity search across a collection using a text query.
+The search process involves several key steps:
 
-```typescript
-search(params: {
-    collection_id: string;
-    query: string;
-    limit?: number;           // Maximum number of results
-    min_score?: number;       // Minimum similarity score (0-1)
-    metadata_filter?: Record<string, string>;  // Optional metadata filtering
-}): Promise<{
-    matches: Array<{
-        document_id: string;
-        chunk_id: string;
-        text: string;
-        score: number;
-        metadata?: Record<string, string>;
-    }>;
-    total_found: number;
-    query_time_ms: number;
-}>;
-```
+1. **Query Processing**
+   - Text query is converted to vector embedding using the collection's configured model
+   - Embedding is validated for proper dimensions and values
+   - Vector norm is pre-computed
 
-**Example:**
-```typescript
-const results = await actor.search({
-    collection_id: "research_papers",
-    query: "What are the latest developments in quantum computing?",
-    limit: 5,
-    min_score: 0.7,
-    metadata_filter: {
-        year: "2023",
-        category: "quantum"
-    }
-});
-```
+2. **Search Method Selection**
+   - For collections > 1000 vectors:
+     - If `use_approximate` is true (default): Uses fast approximate search with k-means clustering
+     - If `use_approximate` is false: Uses exact cosine similarity search (slower but more accurate)
+   - For smaller collections: Always uses exact cosine similarity search
+   - The choice between approximate and exact search is configurable per request
 
-## Search Filtered
+3. **Similarity Computation**
+   - Cosine similarity between query and document vectors
+   - Score range: 0.0 (dissimilar) to 1.0 (identical)
 
-Semantic search with document ID filtering capabilities.
+## Search Configuration
 
 ```typescript
-search_filtered(request: {
-    collection_id: string;
-    query: string;
-    limit?: number;
-    min_score?: number;
-    filter?: Record<string, string>;  // Metadata filters
-}): Promise<Array<{
-    document_id: string;
-    chunk_id: string;
-    score: number;
-    text: string;
-}>>;
+interface SimilarityConfig {
+    min_score?: number;        // Minimum similarity threshold (0-1)
+    max_results: number;       // Maximum results to return
+    use_approximate: boolean;  // Use fast approximate search
+    candidate_factor: number;  // Candidate multiplier for accuracy
+}
 ```
 
-## Find Similar Documents
+## Search Methods
 
-Finds documents similar to a given document.
+| Method                    | Description                    | Algorithm             | Use Case               |
+| ------------------------- | ------------------------------ | --------------------- | ---------------------- |
+| `search`                  | Standard semantic search       | Hierarchical + Cosine | General purpose search |
+| `search_filtered`         | Search with document filtering | Hierarchical + Cosine | Targeted search        |
+| `find_similar_documents`  | Document similarity            | Centroid-based        | Related content        |
+| `batch_similarity_search` | Multiple queries               | Parallel search       | Bulk operations        |
+
+## Search Parameters
 
 ```typescript
-find_similar_documents(
-    document_id: string,
-    collection_id: string,
-    limit?: number,
-    min_score?: number
-): Promise<{
-    matches: Array<{
-        document_id: string;
-        chunk_id: string;
-        text: string;
-        score: number;
-        metadata?: Record<string, string>;
-    }>;
-    total_found: number;
-    query_time_ms: number;
-}>;
+interface SearchRequest {
+    collection_id: string;     // Target collection
+    query: string;            // Search text
+    limit?: number;           // Max results (default: 10)
+    min_score?: number;       // Min similarity (0-1)
+    filter?: string[];        // Document ID filter
+    use_approximate?: boolean; // Whether to use fast approximate search (default: true)
+}
 ```
 
-## Batch Similarity Search
-
-Performs similarity search across multiple collections simultaneously.
+## Search Results
 
 ```typescript
-batch_similarity_search(
-    queries: Array<string>,
-    collection_id: string,
-    limit?: number,
-    min_score?: number
-): Promise<Array<{
-    query: string;
-    matches: Array<{
-        document_id: string;
-        chunk_id: string;
-        text: string;
-        score: number;
-        metadata?: Record<string, string>;
-    }>;
-    total_found: number;
-    query_time_ms: number;
-}>>;
+interface SearchResult {
+    document_id: string;      // Source document
+    chunk_id: string;         // Matching chunk
+    text: string;            // Chunk content
+    score: number;           // Similarity score (0-1)
+    metadata?: Record<string, string>;  // Optional metadata
+}
 ```
-
-## Demo Vector Similarity
-
-A simplified search function for testing and demonstration purposes.
-
-```typescript
-demo_vector_similarity(
-    documents: Array<string>,
-    query: string,
-    proxy_url: string,
-    limit?: number,
-    min_score?: number
-): Promise<{
-    matches: Array<{
-        document_id: string;
-        chunk_id: string;
-        text: string;
-        score: number;
-    }>;
-    total_found: number;
-    query_time_ms: number;
-}>;
-```
-
-## Error Handling
-
-All vector search functions can return the following errors:
-
-```typescript
-type SearchError = {
-    NotFound: string;           // Collection or document not found
-    NotAuthorized: string;      // Caller lacks required permissions
-    InvalidInput: string;       // Invalid parameters provided
-    EmbeddingError: string;     // Failed to generate embeddings
-    InvalidProxy: string;       // Invalid proxy URL
-    SearchError: string;        // General search error
-};
-```
-
-## Best Practices
-
-1. **Query Optimization**
-   - Keep queries concise and focused
-   - Use appropriate minimum score thresholds
-   - Consider using metadata filters for better results
-
-2. **Performance Considerations**
-   - Use appropriate limit values
-   - Consider batch operations for multiple queries
-   - Monitor query times for optimization
-
-3. **Result Handling**
-   - Always check total_found count
-   - Consider score thresholds for quality
-   - Use metadata for additional filtering 
