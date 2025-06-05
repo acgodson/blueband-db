@@ -1,4 +1,4 @@
-# 🌀 Blueband: Vector db on ICP
+# 🌀 Blueband: Vector DB on ICP
 
 <div class="hero">
   <p class="description">

@@ -51,6 +51,7 @@
             border-left: 1px solid #eaecef !important;
             font-size: 0.9rem !important;
             z-index: 100 !important;
+            box-shadow: -2px 0 4px rgba(0, 0, 0, 0.05) !important;
         }
 
         .page_toc .title {
@@ -82,6 +83,8 @@
             transition: all 0.3s ease !important;
             border-left: 2px solid transparent !important;
             padding-left: 0.5rem !important;
+            font-size: 0.9rem !important;
+            line-height: 1.4 !important;
         }
 
         .page_toc a:hover {
@@ -95,9 +98,11 @@
             font-weight: 500 !important;
         }
 
+        /* Ensure content doesn't overlap with TOC */
         @media screen and (min-width: 1024px) {
             .markdown-section {
-                margin-right: var(--toc-width);
+                margin-right: var(--toc-width) !important;
+                padding-right: 2rem !important;
             }
         }
 
@@ -106,10 +111,8 @@
                 display: none !important;
             }
             .markdown-section {
-                margin-right: 0;
-            }
-            .app-nav + .sidebar + .content {
-                margin-right: 0;
+                margin-right: 0 !important;
+                padding-right: 2rem !important;
             }
         }
 
@@ -264,14 +267,6 @@
             alias: {
                 '/.*/_sidebar.md': '/_sidebar.md'
             },
-            pageToc: {
-                scope: '.markdown-section',
-                headings: 'h1, h2, h3, h4, h5, h6',
-                title: 'On This Page',
-                scrollTo: true,
-                scrollToOffset: 70,
-                target: '.page_toc'
-            },
             search: {
                 maxAge: 86400000,
                 paths: 'auto',
@@ -302,10 +297,27 @@
     <!-- Plugins -->
     <script src="//cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
     <script src="//cdn.jsdelivr.net/npm/docsify@4/lib/plugins/zoom-image.min.js"></script>
-    <script src="//cdn.jsdelivr.net/npm/docsify-plugin-page-toc"></script>
+    <script src="//cdn.jsdelivr.net/npm/docsify-toc@1.0.0/dist/docsify-toc.min.js"></script>
     <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-rust.min.js"></script>
     <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-typescript.min.js"></script>
     <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+
+    <!-- Add initialization script -->
+    <script>
+        // Initialize TOC plugin after Docsify is loaded
+        window.addEventListener('load', function() {
+            if (window.DocsifyToc) {
+                window.DocsifyToc.init({
+                    scope: '.markdown-section',
+                    headings: 'h1, h2, h3, h4, h5, h6',
+                    title: 'On This Page',
+                    scrollTo: true,
+                    scrollToOffset: 70,
+                    target: '.page_toc'
+                });
+            }
+        });
+    </script>
 </body>
 
 </html>
