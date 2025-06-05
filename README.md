@@ -1,6 +1,6 @@
 # Blueband DB
 
-An on-chain vector database built on the ICP for semantic search, similarity matching, and document retrieval
+An on-chain vector database built on ICP.
 
 - **`Semantic Document Processing`**: Intelligent text chunking with configurable overlap and embedding generation
 - **`Hierarchical Vector Indexing`**: K-means clustering for sub-linear search performance on large datasets
@@ -39,17 +39,9 @@ Then deploy:
 ```bash
 dfx start --background
 dfx canister create blueband_rust
-dfx canister install blueband_rust
+dfx deploy
 ```
 
-### Manual Installation
-
-```bash
-# Download and deploy directly
-wget https://github.com/acgodson/blueband-db/releases/download/v0.1.9/blueband_rust.wasm.gz
-gunzip blueband_rust.wasm.gz
-dfx canister install --mode install --wasm blueband_rust.wasm <canister-id>
-```
 
 
 ### Usage
@@ -113,14 +105,19 @@ const similar = await actor.find_similar_documents(source_id, collection_id, con
 
 ## Use Cases
 
-- **`Enterprise Search`**: Intelligent document retrieval across knowledge bases
-- **`Recommendation Systems`**: Content similarity for personalized suggestions  
-- **`Research Platforms`**: Semantic paper discovery and citation analysis
+
+- **`Recommendation Systems`**
+- **`Research papers`**: 
+- **`Legal or compliance documents`**
+- **`Public health bulletins`**
+- **`Academic course materials`**
+- **`Static knowledge bases`**
+-**`Community-generated content`**
 
 
 ## Documentation
 
-- [API Reference](docs/api.md) - Operations documentation
+- [API Reference](https://acgodson.github.io/blueband-db/)
 
 
 
