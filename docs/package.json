@@ -1,18 +1,17 @@
 {
-  "name": "blueband-docs",
-  "version": "1.0.0",
-  "description": "Documentation for Blueband vector db",
-  "scripts": {
-    "start": "docsify serve",
-    "build": "docsify generate .",
-    "deploy": "npm run build && gh-pages -d ."
-  },
-  "dependencies": {
-    "docsify": "^4.4.6",
-    "docsify-cli": "^4.4.4",
-    "gh-pages": "^6.1.1"
-  },
-  "devDependencies": {
-    "prismjs": "^1.29.0"
-  }
-} 
+    "name": "blueband-docs",
+    "version": "1.0.0",
+    "description": "Documentation for Blueband vector db",
+    "scripts": {
+        "start": "docsify serve",
+        "deploy": "gh-pages -d ."
+    },
+    "dependencies": {
+        "docsify": "^4.4.6",
+        "docsify-cli": "^4.4.4",
+        "gh-pages": "^6.1.1"
+    },
+    "devDependencies": {
+        "prismjs": "^1.29.0"
+    }
+}
