@@ -1,7 +1,7 @@
 {
     "name": "blueband-docs",
     "version": "1.0.0",
-    "description": "Documentation for Blueband vector database",
+    "description": "Documentation for Blueband vector db",
     "scripts": {
         "start": "docsify serve",
         "deploy": "gh-pages -d ."
