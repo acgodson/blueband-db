@@ -1,8 +1,8 @@
 // storage/memory.rs
+use candid::CandidType;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::{DefaultMemoryImpl, Memory as IcMemory};
 use std::cell::RefCell;
-use candid::CandidType;
 
 pub type MemoryType = VirtualMemory<DefaultMemoryImpl>;
 pub type MemManager = MemoryManager<DefaultMemoryImpl>;
@@ -15,15 +15,14 @@ pub const CHUNKS_MEMORY_ID: MemoryId = MemoryId::new(2);
 pub const VECTORS_MEMORY_ID: MemoryId = MemoryId::new(3);
 pub const VECTOR_INDEX_MEMORY_ID: MemoryId = MemoryId::new(4);
 pub const CONFIG_MEMORY_ID: MemoryId = MemoryId::new(5);
-pub const DOCUMENT_INDEX_MEMORY_ID: MemoryId = MemoryId::new(6); // NEW: Document index
+pub const DOCUMENT_INDEX_MEMORY_ID: MemoryId = MemoryId::new(6); 
 
 // Performance tracking
-pub const METRICS_MEMORY_ID: MemoryId = MemoryId::new(10);
+// pub const METRICS_MEMORY_ID: MemoryId = MemoryId::new(10);
 
-// Reserved for future governance (Phase 2)
-pub const GOVERNANCE_MEMORY_ID: MemoryId = MemoryId::new(20);
-pub const PROPOSALS_MEMORY_ID: MemoryId = MemoryId::new(21);
-pub const VOTES_MEMORY_ID: MemoryId = MemoryId::new(22);
+// pub const GOVERNANCE_MEMORY_ID: MemoryId = MemoryId::new(20);
+// pub const PROPOSALS_MEMORY_ID: MemoryId = MemoryId::new(21);
+// pub const VOTES_MEMORY_ID: MemoryId = MemoryId::new(22);
 
 // Global memory manager instance
 thread_local! {
@@ -55,7 +54,6 @@ pub fn get_memory_stats() -> MemoryStats {
     })
 }
 
-/// Estimate used pages across all memory spaces
 fn estimate_used_pages() -> u64 {
     MEMORY_MANAGER.with(|m| {
         let manager = m.borrow();
@@ -68,7 +66,7 @@ fn estimate_used_pages() -> u64 {
             CHUNKS_MEMORY_ID,
             VECTORS_MEMORY_ID,
             VECTOR_INDEX_MEMORY_ID,
-            DOCUMENT_INDEX_MEMORY_ID, // Include new document index
+            DOCUMENT_INDEX_MEMORY_ID, 
         ] {
             total += manager.get(id).size();
         }
@@ -77,7 +75,7 @@ fn estimate_used_pages() -> u64 {
     })
 }
 
-#[derive(CandidType, Debug, Clone)] 
+#[derive(CandidType, Debug, Clone)]
 pub struct MemoryStats {
     pub total_pages: u64,
     pub used_pages: u64,
@@ -85,20 +83,20 @@ pub struct MemoryStats {
     pub available_bytes: u64,
 }
 
-impl MemoryStats {
-    pub fn usage_percentage(&self) -> f64 {
-        if self.total_pages == 0 {
-            0.0
-        } else {
-            (self.used_pages as f64 / self.total_pages as f64) * 100.0
-        }
-    }
+// impl MemoryStats {
+//     pub fn usage_percentage(&self) -> f64 {
+//         if self.total_pages == 0 {
+//             0.0
+//         } else {
+//             (self.used_pages as f64 / self.total_pages as f64) * 100.0
+//         }
+//     }
 
-    pub fn available_gb(&self) -> f64 {
-        self.available_bytes as f64 / (1024.0 * 1024.0 * 1024.0)
-    }
+//     pub fn available_gb(&self) -> f64 {
+//         self.available_bytes as f64 / (1024.0 * 1024.0 * 1024.0)
+//     }
 
-    pub fn used_gb(&self) -> f64 {
-        (self.used_pages * 65536) as f64 / (1024.0 * 1024.0 * 1024.0)
-    }
-}
+//     pub fn used_gb(&self) -> f64 {
+//         (self.used_pages * 65536) as f64 / (1024.0 * 1024.0 * 1024.0)
+//     }
+// }

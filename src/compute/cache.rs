@@ -1,9 +1,8 @@
-// compute/cache.rs - FIXED: Bounded LRU Cache with Memory Limits
+// compute/cache.rs
 use crate::types::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-/// Cache entry with vectors and access tracking
 #[derive(Clone, Debug)]
 struct CacheEntry {
     vectors: Vec<Vector>,
@@ -12,14 +11,13 @@ struct CacheEntry {
     memory_size: usize, // Track memory usage of this entry
 }
 
-/// LRU cache with memory bounds
 #[derive(Debug)]
 struct BoundedCache {
     entries: HashMap<String, CacheEntry>,
-    access_order: Vec<String>, // LRU tracking (most recent at end)
-    total_memory: usize,       // Current memory usage
-    max_memory: usize,         // Memory limit
-    max_entries: usize,        // Entry count limit
+    access_order: Vec<String>,
+    total_memory: usize,
+    max_memory: usize,
+    max_entries: usize,
 }
 
 impl BoundedCache {
@@ -167,17 +165,14 @@ thread_local! {
     );
 }
 
-/// Cache TTL in nanoseconds (24 hours)
 const CACHE_TTL: u64 = 24 * 60 * 60 * 1_000_000_000;
 
-/// Get vectors from cache or storage (BOUNDED)
 pub fn get_cached_vectors(collection_id: &str) -> Vec<Vector> {
     let cache_hit = CACHE.with(|cache| cache.borrow_mut().get(collection_id));
 
     match cache_hit {
         Some(vectors) => vectors,
         None => {
-            // Load from storage and cache
             let vectors = crate::storage::get_collection_vectors(collection_id);
 
             if !vectors.is_empty() {
@@ -193,26 +188,22 @@ pub fn get_cached_vectors(collection_id: &str) -> Vec<Vector> {
     }
 }
 
-/// Invalidate cache for a collection when data changes
 pub fn invalidate_collection_cache(collection_id: &str) {
     CACHE.with(|cache| {
         cache.borrow_mut().remove(collection_id);
     });
 }
 
-/// Clear all cache
 pub fn clear_cache() {
     CACHE.with(|cache| {
         cache.borrow_mut().clear();
     });
 }
 
-/// Get cache statistics for monitoring
 pub fn get_cache_stats() -> CacheStats {
     CACHE.with(|cache| cache.borrow().get_stats())
 }
 
-/// Force cache cleanup (remove expired entries)
 pub fn cleanup_cache() -> u32 {
     CACHE.with(|cache| {
         let mut cache = cache.borrow_mut();
@@ -223,7 +214,6 @@ pub fn cleanup_cache() -> u32 {
     })
 }
 
-/// Estimate memory usage of vectors for cache management
 fn estimate_vectors_memory_size(vectors: &[Vector]) -> usize {
     let mut total_size = 0;
 

@@ -1,9 +1,8 @@
 // storage/vectors.rs
+use super::memory::{get_memory, MemoryType, VECTORS_MEMORY_ID, VECTOR_INDEX_MEMORY_ID};
 use ic_stable_structures::{StableBTreeMap, Storable};
 use std::cell::RefCell;
 
-use super::memory::{get_memory, MemoryType, VECTORS_MEMORY_ID, VECTOR_INDEX_MEMORY_ID};
-use crate::types::current_time;
 use crate::types::*;
 
 // =============================================================================
@@ -16,7 +15,7 @@ thread_local! {
         StableBTreeMap::init(get_memory(VECTORS_MEMORY_ID))
     );
 
-    // Vector Index: collection_id -> Vec<VectorId> (for O(1) collection lookups)
+    // Vector Index: collection_id -> Vec<VectorId>
     static VECTOR_INDEX: RefCell<StableBTreeMap<String, StringList, MemoryType>> = RefCell::new(
         StableBTreeMap::init(get_memory(VECTOR_INDEX_MEMORY_ID))
     );
@@ -26,9 +25,7 @@ thread_local! {
 // VECTOR STORAGE OPERATIONS
 // =============================================================================
 
-/// Stores a vector with validation - pure storage operation
 pub fn store_vector(vector: Vector) -> Result<(), String> {
-    // Basic validation first
     if vector.embedding.is_empty() {
         return Err("Vector embedding cannot be empty".to_string());
     }
@@ -39,7 +36,6 @@ pub fn store_vector(vector: Vector) -> Result<(), String> {
 
     let collection_id = extract_collection_id_from_document_id(&vector.document_id)?;
 
-    // Verify dependencies exist BEFORE any writes
     if !super::collections::collection_exists(&collection_id) {
         return Err(format!("Collection '{}' not found", collection_id));
     }
@@ -47,19 +43,15 @@ pub fn store_vector(vector: Vector) -> Result<(), String> {
         return Err(format!("Document '{}' not found", vector.document_id));
     }
 
-    // SINGLE ATOMIC SCOPE: Both operations happen in one borrow
     VECTORS.with(|v| {
         VECTOR_INDEX.with(|vi| {
             let mut vectors = v.borrow_mut();
             let mut index = vi.borrow_mut();
 
-            // Check if vector already exists
             let vector_exists = vectors.contains_key(&vector.id);
 
-            // Prepare index update
             let mut vector_ids = index.get(&collection_id.to_string()).unwrap_or_default();
 
-            // ATOMIC: Both writes happen in sequence with no opportunity for failure between them
             vectors.insert(vector.id.clone(), vector.clone());
 
             if !vector_exists {
@@ -72,27 +64,22 @@ pub fn store_vector(vector: Vector) -> Result<(), String> {
     })
 }
 
-/// Retrieves a vector by ID
 pub fn get_vector(vector_id: &str) -> Option<Vector> {
     VECTORS.with(|v| v.borrow().get(&vector_id.to_string()))
 }
 
-/// Deletes a vector by ID
 pub fn delete_vector(vector_id: &str) -> Result<(), String> {
-    // Get vector info first (outside the atomic section)
     let vector = VECTORS
         .with(|v| v.borrow().get(&vector_id.to_string()))
         .ok_or_else(|| format!("Vector '{}' not found", vector_id))?;
 
     let collection_id = extract_collection_id_from_document_id(&vector.document_id)?;
 
-    // SINGLE ATOMIC SCOPE: Both deletions happen together
     VECTORS.with(|v| {
         VECTOR_INDEX.with(|vi| {
             let mut vectors = v.borrow_mut();
             let mut index = vi.borrow_mut();
 
-            // ATOMIC: Both removes happen in sequence
             if let Some(_removed_vector) = vectors.remove(&vector_id.to_string()) {
                 // Only update index if vector was actually removed
                 if let Some(mut vector_ids) = index.get(&collection_id.to_string()) {
@@ -107,7 +94,6 @@ pub fn delete_vector(vector_id: &str) -> Result<(), String> {
     })
 }
 
-/// Gets all vectors for a collection (used by compute layer)
 pub fn get_collection_vectors(collection_id: &str) -> Vec<Vector> {
     VECTOR_INDEX.with(|vi| {
         if let Some(vector_ids) = vi.borrow().get(&collection_id.to_string()) {
@@ -125,7 +111,6 @@ pub fn get_collection_vectors(collection_id: &str) -> Vec<Vector> {
     })
 }
 
-/// Gets vectors for a collection with limit (optimization for compute layer)
 pub fn get_vectors_for_similarity(collection_id: &str, limit: Option<u32>) -> Vec<Vector> {
     let mut vectors = get_collection_vectors(collection_id);
 
@@ -136,9 +121,7 @@ pub fn get_vectors_for_similarity(collection_id: &str, limit: Option<u32>) -> Ve
     vectors
 }
 
-/// Deletes all vectors associated with a document
 pub fn delete_document_vectors(document_id: &str) -> Result<(), String> {
-    // Get all vector IDs for this document first
     let vector_ids_to_delete: Vec<String> = VECTORS.with(|v| {
         v.borrow()
             .iter()
@@ -156,7 +139,6 @@ pub fn delete_document_vectors(document_id: &str) -> Result<(), String> {
         return Ok(()); // Nothing to delete
     }
 
-    // Get collection ID from first vector
     let collection_id = if let Some(first_vector_id) = vector_ids_to_delete.first() {
         let vector = VECTORS.with(|v| v.borrow().get(first_vector_id));
         if let Some(vector) = vector {
@@ -168,20 +150,17 @@ pub fn delete_document_vectors(document_id: &str) -> Result<(), String> {
         return Ok(());
     };
 
-    // ATOMIC: Delete all vectors and update index in single operation
     VECTORS.with(|v| {
         VECTOR_INDEX.with(|vi| {
             let mut vectors = v.borrow_mut();
             let mut index = vi.borrow_mut();
             let mut vector_ids = index.get(&collection_id).unwrap_or_default();
 
-            // Remove all vectors and their index entries atomically
             for vector_id in &vector_ids_to_delete {
                 vectors.remove(vector_id);
                 vector_ids.0.retain(|id| id != vector_id);
             }
 
-            // Update index once
             index.insert(collection_id, vector_ids);
 
             Ok(())
@@ -189,7 +168,6 @@ pub fn delete_document_vectors(document_id: &str) -> Result<(), String> {
     })
 }
 
-/// Gets all vectors for a specific document
 pub fn get_document_vectors(document_id: &str) -> Vec<Vector> {
     VECTORS.with(|v| {
         v.borrow()
@@ -205,7 +183,6 @@ pub fn get_document_vectors(document_id: &str) -> Vec<Vector> {
     })
 }
 
-/// Gets a specific chunk vector
 pub fn get_chunk_vector(document_id: &str, chunk_id: &str) -> Option<Vector> {
     VECTORS.with(|v| {
         v.borrow().iter().find_map(|(_, vector)| {
@@ -308,7 +285,7 @@ pub fn store_vectors_batch(vectors: Vec<Vector>) -> Result<u32, String> {
         }
     }
 
-    // Group vectors by collection for efficient batch processing
+    // Group vectors by collection 
     let mut vectors_by_collection: std::collections::HashMap<String, Vec<Vector>> =
         std::collections::HashMap::new();
 
@@ -329,7 +306,6 @@ pub fn store_vectors_batch(vectors: Vec<Vector>) -> Result<u32, String> {
             return Err(format!("Collection '{}' not found", collection_id));
         }
 
-        // Atomic batch insert for this collection
         let stored_count: Result<u32, String> = VECTORS.with(|v| {
             VECTOR_INDEX.with(|vi| {
                 let mut vectors_map = v.borrow_mut();
@@ -338,7 +314,6 @@ pub fn store_vectors_batch(vectors: Vec<Vector>) -> Result<u32, String> {
 
                 let mut count = 0u32;
 
-                // All vectors for this collection in one atomic operation
                 for vector in collection_vectors {
                     let vector_exists = vectors_map.contains_key(&vector.id);
 
@@ -458,7 +433,6 @@ pub fn get_collection_embedding_dimensions(collection_id: &str) -> Option<u32> {
 
 /// Extracts collection_id from document_id by checking all collections
 fn extract_collection_id_from_document_id(document_id: &str) -> Result<String, String> {
-    // Check all collections to find where this document exists
     for collection in super::collections::list_collections() {
         if super::documents::document_exists(&collection.id, document_id) {
             return Ok(collection.id);

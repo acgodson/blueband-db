@@ -1,7 +1,7 @@
 // storage/documents.rs
 use ic_stable_structures::{StableBTreeMap, Storable};
 use std::cell::RefCell;
-// use ic_stable_structures::Memory;
+
 
 use super::memory::{
     get_memory, CHUNKS_MEMORY_ID, DOCUMENTS_MEMORY_ID, DOCUMENT_INDEX_MEMORY_ID,
@@ -37,11 +37,10 @@ thread_local! {
 pub fn add_document(request: AddDocumentRequest) -> Result<DocumentMetadata, String> {
     validate_document_content(&request.content)?;
 
-    // Verify collection exists
+
     let collection = super::collections::get_collection(&request.collection_id)
         .ok_or_else(|| format!("Collection '{}' not found", request.collection_id))?;
 
-    // Check document limits
     if let Some(max_docs) = collection.settings.max_documents {
         let current_count = count_collection_documents(&request.collection_id);
         if current_count >= max_docs as u64 {
@@ -55,7 +54,6 @@ pub fn add_document(request: AddDocumentRequest) -> Result<DocumentMetadata, Str
     let document_id = generate_id("doc", &request.title);
     let storage_key = format!("{}::{}", request.collection_id, document_id);
 
-    // Calculate checksum
     let checksum = {
         use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
@@ -63,7 +61,6 @@ pub fn add_document(request: AddDocumentRequest) -> Result<DocumentMetadata, Str
         format!("{:x}", hasher.finalize())
     };
 
-    // Create semantic chunks
     let chunks = create_semantic_chunks(&request.content, &document_id, &collection.settings);
 
     let document = DocumentMetadata {
@@ -82,10 +79,10 @@ pub fn add_document(request: AddDocumentRequest) -> Result<DocumentMetadata, Str
     // Store document metadata
     DOCUMENTS.with(|d| d.borrow_mut().insert(storage_key, document.clone()));
 
-    // Store all chunks for this document (O(1) storage)
+    // Store all chunks for this document
     DOCUMENT_CHUNKS.with(|c| c.borrow_mut().insert(document_id.clone(), ChunkList(chunks)));
 
-    // Update document index for O(1) collection lookups
+    // Update document index for collection lookups
     add_to_document_index(&request.collection_id, &document_id);
 
     Ok(document)

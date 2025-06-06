@@ -1,6 +1,5 @@
 // storage/collections.rs
 use crate::storage::memory::MemoryType;
-use ic_stable_structures::Memory;
 use ic_stable_structures::StableBTreeMap;
 use std::cell::RefCell;
 
@@ -28,7 +27,6 @@ pub fn create_collection(
 ) -> Result<Collection, String> {
     validate_collection_id(&request.id)?;
 
-    // Check if collection already exists
     if get_collection(&request.id).is_some() {
         return Err(format!("Collection '{}' already exists", request.id));
     }
@@ -39,8 +37,8 @@ pub fn create_collection(
         description: request.description,
         created_at: current_time(),
         updated_at: current_time(),
-        genesis_admin: creator.clone(), // Track genesis admin separately
-        admins: vec![creator],          // Genesis admin is also in admins list
+        genesis_admin: creator.clone(),
+        admins: vec![creator],
         settings: request.settings.unwrap_or_default(),
     };
 
@@ -123,17 +121,14 @@ pub fn add_collection_admin(
 ) -> Result<(), String> {
     COLLECTIONS.with(|c| {
         if let Some(mut collection) = c.borrow().get(&collection_id.to_string()) {
-            // CRITICAL FIX: Only genesis admin can add admins
             if collection.genesis_admin != caller {
                 return Err("Only the genesis admin can add new admins".to_string());
             }
 
-            // Check if already an admin
             if collection.admins.contains(&new_admin.to_string()) {
                 return Err("User is already an admin".to_string());
             }
 
-            // Add the new admin
             collection.admins.push(new_admin.to_string());
             collection.updated_at = current_time();
 
@@ -152,22 +147,18 @@ pub fn remove_collection_admin(
 ) -> Result<(), String> {
     COLLECTIONS.with(|c| {
         if let Some(mut collection) = c.borrow().get(&collection_id.to_string()) {
-            // CRITICAL FIX: Only genesis admin can remove admins
             if collection.genesis_admin != caller {
                 return Err("Only the genesis admin can remove admins".to_string());
             }
 
-            // Cannot remove the genesis admin
             if admin_to_remove == collection.genesis_admin {
                 return Err("Cannot remove the genesis admin".to_string());
             }
 
-            // Check if the admin exists
             if !collection.admins.contains(&admin_to_remove.to_string()) {
                 return Err("User is not an admin".to_string());
             }
 
-            // Remove the admin
             collection.admins.retain(|admin| admin != admin_to_remove);
             collection.updated_at = current_time();
 
@@ -186,17 +177,14 @@ pub fn transfer_genesis_admin(
 ) -> Result<(), String> {
     COLLECTIONS.with(|c| {
         if let Some(mut collection) = c.borrow().get(&collection_id.to_string()) {
-            // Only current genesis admin can transfer
             if collection.genesis_admin != caller {
                 return Err("Only the current genesis admin can transfer ownership".to_string());
             }
 
-            // New genesis admin must be an existing admin
             if !collection.admins.contains(&new_genesis_admin.to_string()) {
                 return Err("New genesis admin must be an existing admin".to_string());
             }
 
-            // Transfer ownership
             collection.genesis_admin = new_genesis_admin.to_string();
             collection.updated_at = current_time();
 
@@ -235,7 +223,6 @@ pub fn update_collection_metadata(
     description: Option<String>,
     caller: &str,
 ) -> Result<(), String> {
-    // Any admin can update metadata (unchanged behavior)
     require_admin_access(collection_id, caller)?;
 
     COLLECTIONS.with(|c| {
@@ -265,7 +252,6 @@ pub fn update_collection_metadata(
 }
 
 pub fn delete_collection(collection_id: &str, caller: &str) -> Result<(), String> {
-    // Only genesis admin can delete collections
     require_genesis_admin(collection_id, caller)?;
 
     COLLECTIONS.with(|c| {
@@ -334,12 +320,11 @@ pub fn get_admin_level(collection_id: &str, caller: &str) -> AdminLevel {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AdminLevel {
-    Genesis, // Can manage admins and all operations
-    Regular, // Can manage content but not admins
-    None,    // No admin privileges
+    Genesis,
+    Regular,
+    None,
 }
 
-/// Helper function to check if user has at least regular admin permissions
 pub fn require_admin_access(collection_id: &str, caller: &str) -> Result<AdminLevel, String> {
     let level = get_admin_level(collection_id, caller);
     match level {

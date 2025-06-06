@@ -1,30 +1,19 @@
-// lib.rs - Complete Vector Database API Layer
-use ic_cdk::api::caller;
-use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
-use candid::CandidType;
-use candid::export_service;
-use serde::{Serialize, Deserialize};
+// lib.rs                                                     use crate::compute::EmbeddingModel;
+use crate::compute::{cosine_similarity_search, similarity_search_filtered, SimilarityConfig};
 use crate::storage::collections;
 use crate::storage::documents;
 use crate::storage::vectors;
-use crate::compute::{
-    cosine_similarity_search, similarity_search_filtered,
-    MemorySearchResult, SimilarityConfig,
-};
-use crate::types::{
-    SearchRequest, SearchResponse,
-};
-use crate::compute::EmbeddingModel;
-use ic_cdk::api::management_canister::http_request::{TransformArgs, HttpResponse};
-
+use candid::CandidType;
+use ic_cdk::api::caller;
+use ic_cdk::api::management_canister::http_request::{HttpResponse, TransformArgs};
+use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
+use serde::{Deserialize, Serialize};
 
 mod compute;
 mod storage;
 mod types;
 
 pub use types::*;
-
-
 
 // =============================================================================
 // CANISTER LIFECYCLE
@@ -76,7 +65,10 @@ fn list_collections_with_stats() -> Vec<CollectionWithStats> {
 }
 
 #[update]
-fn update_collection_settings(collection_id: String, settings: CollectionSettings) -> Result<(), String> {
+fn update_collection_settings(
+    collection_id: String,
+    settings: CollectionSettings,
+) -> Result<(), String> {
     let caller = ic_cdk::caller().to_string();
     collections::update_collection_settings(&collection_id, settings, &caller)
 }
@@ -148,18 +140,13 @@ fn get_genesis_admin(collection_id: String) -> Option<String> {
 
 #[update]
 async fn add_document(request: AddDocumentRequest) -> Result<DocumentMetadata, String> {
-    // Verify caller has admin access
     let caller = caller().to_string();
     if !storage::is_collection_admin(&request.collection_id, &caller) {
         return Err("Only collection admins can add documents".to_string());
     }
 
-    // Add document to storage
     let document = storage::add_document(request)?;
-    
-    // Invalidate cache since we're adding new content
     compute::invalidate_collection_cache(&document.collection_id);
-    
     Ok(document)
 }
 
@@ -168,7 +155,6 @@ async fn add_document_and_embed(
     request: AddDocumentRequest,
     proxy_url: String,
 ) -> Result<DocumentMetadata, String> {
-    // Verify caller has admin access
     let caller = caller().to_string();
     if !storage::is_collection_admin(&request.collection_id, &caller) {
         return Err("Only collection admins can add documents".to_string());
@@ -180,25 +166,21 @@ async fn add_document_and_embed(
 
     // Step 1: Add document to storage
     let document = storage::add_document(request)?;
-    
+
     // Step 2: Generate embeddings for document chunks
     let chunks = storage::get_document_chunks(&document.id);
-    
+
     match compute::embed_document_chunks(&chunks, &collection.settings, proxy_url).await {
         Ok(vectors) => {
             // Step 3: Store vectors in stable memory
             match storage::store_vectors_batch(vectors) {
                 Ok(_) => {
-                    // Mark document as embedded
                     storage::mark_document_embedded(&document.collection_id, &document.id)?;
-                    
-                    // Invalidate cache to include new vectors
                     compute::invalidate_collection_cache(&document.collection_id);
-                    
+
                     Ok(document)
                 }
                 Err(e) => {
-                    // Compensation: Remove document if vector storage fails
                     let _ = storage::delete_document(&document.collection_id, &document.id);
                     Err(format!("Failed to store vectors: {}", e))
                 }
@@ -243,7 +225,7 @@ pub async fn search(request: SearchRequest) -> Result<Vec<MemorySearchResult>, S
     let proxy_url = collection.settings.proxy_url;
     let model = parse_embedding_model(&collection.settings.embedding_model)?;
     let (query_embedding, _) = compute::embed_query_text(&request.query, model, proxy_url).await?;
-    
+
     // Use request.use_approximate or default to true for backward compatibility
     let matches = cosine_similarity_search(
         &query_embedding,
@@ -251,19 +233,21 @@ pub async fn search(request: SearchRequest) -> Result<Vec<MemorySearchResult>, S
         &SimilarityConfig {
             min_score: request.min_score,
             max_results: request.limit.unwrap_or(10),
-            use_approximate: request.use_approximate.unwrap_or(true),    // Use request parameter
-            candidate_factor: 3.0,    // Search 3x more candidates for accuracy
-        }
+            use_approximate: request.use_approximate.unwrap_or(true),
+            candidate_factor: 3.0,
+        },
     )?;
-    
-    Ok(matches.into_iter().map(|m| MemorySearchResult {
-        document_id: m.document_id,
-        chunk_id: m.chunk_id,
-        score: m.score,
-        text: m.chunk_text.unwrap_or_default(),
-    }).collect())
-}
 
+    Ok(matches
+        .into_iter()
+        .map(|m| MemorySearchResult {
+            document_id: m.document_id,
+            chunk_id: m.chunk_id,
+            score: m.score,
+            text: m.chunk_text.unwrap_or_default(),
+        })
+        .collect())
+}
 
 #[update]
 pub async fn search_filtered(request: SearchRequest) -> Result<Vec<MemorySearchResult>, String> {
@@ -271,9 +255,9 @@ pub async fn search_filtered(request: SearchRequest) -> Result<Vec<MemorySearchR
         .ok_or_else(|| format!("Collection '{}' not found", request.collection_id))?;
     let proxy_url = collection.settings.proxy_url.clone();
     let model = parse_embedding_model(&collection.settings.embedding_model)?;
-    
+
     let (query_embedding, _) = compute::embed_query_text(&request.query, model, proxy_url).await?;
-    
+
     // FIXED: Include new fields in SimilarityConfig
     let matches = similarity_search_filtered(
         &query_embedding,
@@ -282,20 +266,21 @@ pub async fn search_filtered(request: SearchRequest) -> Result<Vec<MemorySearchR
         &SimilarityConfig {
             min_score: request.min_score,
             max_results: request.limit.unwrap_or(10),
-            use_approximate: true,    // Enable fast search by default
-            candidate_factor: 3.0,    // Search 3x more candidates for accuracy
-        }
+            use_approximate: true, // Enable fast search by default
+            candidate_factor: 3.0, // Search 3x more candidates for accuracy
+        },
     )?;
-    
-    Ok(matches.into_iter().map(|m| MemorySearchResult {
-        document_id: m.document_id,
-        chunk_id: m.chunk_id,
-        score: m.score,
-        text: m.chunk_text.unwrap_or_default(),
-    }).collect())
+
+    Ok(matches
+        .into_iter()
+        .map(|m| MemorySearchResult {
+            document_id: m.document_id,
+            chunk_id: m.chunk_id,
+            score: m.score,
+            text: m.chunk_text.unwrap_or_default(),
+        })
+        .collect())
 }
-
-
 
 #[query]
 fn find_similar_documents(
@@ -304,18 +289,15 @@ fn find_similar_documents(
     limit: Option<u32>,
     min_score: Option<f64>,
 ) -> Result<Vec<VectorMatch>, String> {
-    // FIXED: Include new fields in SimilarityConfig
     let config = compute::SimilarityConfig {
         min_score,
         max_results: limit.unwrap_or(10),
-        use_approximate: true,    // Enable fast search by default
-        candidate_factor: 3.0,    // Search 3x more candidates for accuracy
+        use_approximate: true,
+        candidate_factor: 3.0,
     };
-    
+
     compute::find_similar_documents(&source_document_id, &collection_id, &config)
 }
-
-
 
 #[update]
 async fn batch_similarity_search(
@@ -329,22 +311,21 @@ async fn batch_similarity_search(
 
     let model = parse_embedding_model(&collection.settings.embedding_model)?;
     let proxy_url = collection.settings.proxy_url;
-    
-    // Generate embeddings for all queries
+
     let mut query_embeddings = Vec::new();
     for query in queries {
-        let (embedding, _) = compute::embed_query_text(&query, model.clone(), proxy_url.clone()).await?;
+        let (embedding, _) =
+            compute::embed_query_text(&query, model.clone(), proxy_url.clone()).await?;
         query_embeddings.push(embedding);
     }
-    
-    // FIXED: Include new fields in SimilarityConfig
+
     let config = compute::SimilarityConfig {
         min_score,
         max_results: limit.unwrap_or(10),
-        use_approximate: true,    // Enable fast search by default
-        candidate_factor: 3.0,    // Search 3x more candidates for accuracy
+        use_approximate: true,
+        candidate_factor: 3.0,
     };
-    
+
     compute::compute_similarity_batch(&query_embeddings, &collection_id, &config)
 }
 
@@ -367,7 +348,8 @@ async fn demo_vector_similarity(
         proxy_url,
         max_results.unwrap_or(5) as usize,
         min_score,
-    ).await
+    )
+    .await
 }
 
 // =============================================================================
@@ -402,13 +384,12 @@ async fn embed_existing_document(
     let proxy_url = collection.settings.proxy_url.clone();
     let vectors = compute::embed_document_chunks(&chunks, &collection.settings, proxy_url).await?;
     let vector_count = vectors.len() as u32;
-    
+
     storage::store_vectors_batch(vectors)?;
     storage::mark_document_embedded(&collection_id, &document_id)?;
-    
-    // Invalidate cache to include new vectors
+
     compute::invalidate_collection_cache(&collection_id);
-    
+
     Ok(vector_count)
 }
 
@@ -437,7 +418,9 @@ async fn bulk_embed_collection(collection_id: String) -> Result<BulkEmbedResult,
             Ok(_) => result.embedded += 1,
             Err(e) => {
                 result.failed += 1;
-                result.errors.push(format!("Document {}: {}", document.id, e));
+                result
+                    .errors
+                    .push(format!("Document {}: {}", document.id, e));
             }
         }
     }
@@ -463,7 +446,6 @@ fn get_memory_stats() -> storage::MemoryStats {
 fn clear_cache() {
     compute::clear_cache();
 }
-
 
 #[query]
 fn get_cache_stats() -> CacheStats {
@@ -599,10 +581,6 @@ fn get_collection_documents(collection_id: String) -> Vec<DocumentMetadata> {
 fn delete_collection_documents(collection_id: String) -> Result<(), String> {
     documents::delete_collection_documents(&collection_id)
 }
-
-
-
-
 
 #[cfg(test)]
 mod export {

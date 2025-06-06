@@ -94,12 +94,11 @@ pub struct Collection {
     pub description: Option<String>,
     pub created_at: u64,
     pub updated_at: u64,
-    pub genesis_admin: String, // The original creator - only one who can manage admins
-    pub admins: Vec<String>,   // All admins (including genesis admin)
+    pub genesis_admin: String,
+    pub admins: Vec<String>,
     pub settings: CollectionSettings,
 }
 
-// Statistics computed on-demand (not stored)
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct CollectionStats {
     pub document_count: u32,
@@ -108,7 +107,6 @@ pub struct CollectionStats {
     pub updated_at: u64,
 }
 
-// Collection with computed stats for API responses
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct CollectionWithStats {
     pub collection: Collection,
@@ -190,7 +188,7 @@ impl Storable for DocumentMetadata {
 
 impl Storable for SemanticChunk {
     const BOUND: Bound = Bound::Bounded {
-        max_size: 32_768, // 32KB - supports large text chunks (8K characters)
+        max_size: 32_768, // 32KB
         is_fixed_size: false,
     };
 
@@ -205,7 +203,7 @@ impl Storable for SemanticChunk {
 
 impl Storable for Vector {
     const BOUND: Bound = Bound::Bounded {
-        max_size: 262_144, // 256KB - supports up to 65K dimensions (very generous)
+        max_size: 262_144, // 256KB ⚠️
         is_fixed_size: false,
     };
 
@@ -220,7 +218,7 @@ impl Storable for Vector {
 
 impl Storable for Collection {
     const BOUND: Bound = Bound::Bounded {
-        max_size: 8_192, // 8KB - plenty for collection metadata
+        max_size: 8_192, // 8KB 
         is_fixed_size: false,
     };
 
@@ -245,7 +243,7 @@ impl StringList {
 
 impl Storable for StringList {
     const BOUND: Bound = Bound::Bounded {
-        max_size: 65_536, // 64KB - supports large lists of IDs
+        max_size: 65_536, // 64KB 
         is_fixed_size: false,
     };
 
