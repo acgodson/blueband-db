@@ -74,6 +74,8 @@ pub fn add_document(request: AddDocumentRequest) -> Result<DocumentMetadata, Str
         size: request.content.len() as u64,
         is_embedded: false,
         checksum,
+        author: request.author,
+        tags: request.tags,
     };
 
     // Store document metadata

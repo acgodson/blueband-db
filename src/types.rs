@@ -39,6 +39,8 @@ pub struct DocumentMetadata {
     pub size: u64,
     pub is_embedded: bool,
     pub checksum: String,
+    pub author: Option<String>,
+    pub tags: Option<Vec<String>>,
 }
 
 #[derive(CandidType, Default, Clone, Debug, Serialize, Deserialize)]
@@ -142,6 +144,8 @@ pub struct AddDocumentRequest {
     pub content: String,
     pub content_type: Option<ContentType>,
     pub source_url: Option<String>,
+    pub author: Option<String>,
+    pub tags: Option<Vec<String>>,
 }
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
@@ -218,7 +222,7 @@ impl Storable for Vector {
 
 impl Storable for Collection {
     const BOUND: Bound = Bound::Bounded {
-        max_size: 8_192, // 8KB 
+        max_size: 8_192, // 8KB
         is_fixed_size: false,
     };
 
@@ -243,7 +247,7 @@ impl StringList {
 
 impl Storable for StringList {
     const BOUND: Bound = Bound::Bounded {
-        max_size: 65_536, // 64KB 
+        max_size: 65_536, // 64KB
         is_fixed_size: false,
     };
 
