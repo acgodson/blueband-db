@@ -94,20 +94,10 @@ pub fn list_collections_with_stats() -> Vec<CollectionWithStats> {
 // ADMIN MANAGEMENT (Fixed to match Motoko logic)
 // =============================================================================
 
-pub fn is_genesis_admin(collection_id: &str, caller: &str) -> bool {
-    COLLECTIONS.with(|c| {
-        if let Some(collection) = c.borrow().get(&collection_id.to_string()) {
-            collection.genesis_admin == caller
-        } else {
-            false
-        }
-    })
-}
-
 pub fn is_collection_admin(collection_id: &str, caller: &str) -> bool {
     COLLECTIONS.with(|c| {
         if let Some(collection) = c.borrow().get(&collection_id.to_string()) {
-            collection.admins.contains(&caller.to_string())
+            collection.genesis_admin == caller || collection.admins.contains(&caller.to_string())
         } else {
             false
         }
@@ -277,13 +267,6 @@ pub fn collection_exists(collection_id: &str) -> bool {
     COLLECTIONS.with(|c| c.borrow().contains_key(&collection_id.to_string()))
 }
 
-pub fn get_collection_settings(collection_id: &str) -> Option<CollectionSettings> {
-    COLLECTIONS.with(|c| {
-        c.borrow()
-            .get(&collection_id.to_string())
-            .map(|collection| collection.settings)
-    })
-}
 
 pub fn get_collection_admins(collection_id: &str) -> Vec<String> {
     COLLECTIONS.with(|c| {

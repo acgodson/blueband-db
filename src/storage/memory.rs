@@ -20,9 +20,6 @@ pub const DOCUMENT_INDEX_MEMORY_ID: MemoryId = MemoryId::new(6);
 // Performance tracking
 // pub const METRICS_MEMORY_ID: MemoryId = MemoryId::new(10);
 
-// pub const GOVERNANCE_MEMORY_ID: MemoryId = MemoryId::new(20);
-// pub const PROPOSALS_MEMORY_ID: MemoryId = MemoryId::new(21);
-// pub const VOTES_MEMORY_ID: MemoryId = MemoryId::new(22);
 
 // Global memory manager instance
 thread_local! {

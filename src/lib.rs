@@ -20,6 +20,7 @@ pub use types::*;
 // =============================================================================
 
 #[init]
+#[candid::candid_method(init)]
 fn init() {
     ic_cdk::println!("Vector Database canister initialized");
 }
@@ -39,32 +40,38 @@ fn post_upgrade() {
 // =============================================================================
 
 #[update]
+#[candid::candid_method(update)]
 fn create_collection(request: CreateCollectionRequest) -> Result<Collection, String> {
     let caller = caller().to_string();
     storage::create_collection(request, caller)
 }
 
 #[query]
+#[candid::candid_method(query)]
 fn get_collection(collection_id: String) -> Option<Collection> {
     storage::get_collection(&collection_id)
 }
 
 #[query]
+#[candid::candid_method(query)]
 fn list_collections() -> Vec<Collection> {
     storage::list_collections()
 }
 
 #[query]
+#[candid::candid_method(query)]
 fn get_collection_with_stats(collection_id: String) -> Option<CollectionWithStats> {
     storage::get_collection_with_stats(&collection_id)
 }
 
 #[query]
+#[candid::candid_method(query)]
 fn list_collections_with_stats() -> Vec<CollectionWithStats> {
     storage::list_collections_with_stats()
 }
 
 #[update]
+#[candid::candid_method(update)]
 fn update_collection_settings(
     collection_id: String,
     settings: CollectionSettings,
@@ -74,6 +81,7 @@ fn update_collection_settings(
 }
 
 #[update]
+#[candid::candid_method(update)]
 fn update_collection_metadata(
     collection_id: String,
     name: Option<String>,
@@ -84,35 +92,41 @@ fn update_collection_metadata(
 }
 
 #[update]
+#[candid::candid_method(update)]
 fn delete_collection(collection_id: String) -> Result<(), String> {
     let caller = ic_cdk::caller().to_string();
     collections::delete_collection(&collection_id, &caller)
 }
 
 #[update]
+#[candid::candid_method(update)]
 fn add_collection_admin(collection_id: String, new_admin: String) -> Result<(), String> {
     let caller = ic_cdk::caller().to_string();
     collections::add_collection_admin(&collection_id, &new_admin, &caller)
 }
 
 #[update]
+#[candid::candid_method(update)]
 fn remove_collection_admin(collection_id: String, admin_to_remove: String) -> Result<(), String> {
     let caller = ic_cdk::caller().to_string();
     collections::remove_collection_admin(&collection_id, &admin_to_remove, &caller)
 }
 
 #[update]
+#[candid::candid_method(update)]
 fn transfer_genesis_admin(collection_id: String, new_genesis_admin: String) -> Result<(), String> {
     let caller = ic_cdk::caller().to_string();
     collections::transfer_genesis_admin(&collection_id, &new_genesis_admin, &caller)
 }
 
 #[query]
+#[candid::candid_method(query)]
 fn is_collection_admin(collection_id: String, principal: String) -> bool {
     storage::is_collection_admin(&collection_id, &principal)
 }
 
 #[query]
+#[candid::candid_method(query)]
 fn get_my_admin_level(collection_id: String) -> String {
     let caller = ic_cdk::caller().to_string();
     match collections::get_admin_level(&collection_id, &caller) {
@@ -537,7 +551,7 @@ fn delete_vector(vector_id: String) -> Result<(), String> {
 }
 
 #[update]
-fn delete_document_vectors(collection_id: String, document_id: String) -> Result<(), String> {
+fn delete_document_vectors(_collection_id: String, document_id: String) -> Result<(), String> {
     vectors::delete_document_vectors(&document_id)
 }
 
@@ -548,8 +562,8 @@ fn clear_collection_vectors(collection_id: String) -> Result<(), String> {
 }
 
 #[update]
-fn validate_collection_vectors(collection_id: String) -> Vec<String> {
-    vectors::validate_vectors()
+fn validate_collection_vectors(collection_id: String, should_repair: Option<bool>) -> Vec<String> {
+    vectors::validate_vectors(&collection_id, should_repair.unwrap_or(false))
 }
 
 // =============================================================================
@@ -581,6 +595,9 @@ fn get_collection_documents(collection_id: String) -> Vec<DocumentMetadata> {
 fn delete_collection_documents(collection_id: String) -> Result<(), String> {
     documents::delete_collection_documents(&collection_id)
 }
+
+
+
 
 #[cfg(test)]
 mod export {

@@ -1,8 +1,10 @@
 type AddDocumentRequest = record {
   title : text;
   content : text;
+  tags : opt vec text;
   content_type : opt ContentType;
   collection_id : text;
+  author : opt text;
   source_url : opt text;
 };
 type BulkEmbedResult = record {
@@ -58,9 +60,11 @@ type DocumentMetadata = record {
   total_chunks : nat32;
   title : text;
   size : nat64;
+  tags : opt vec text;
   content_type : ContentType;
   collection_id : text;
   is_embedded : bool;
+  author : opt text;
   source_url : opt text;
   timestamp : nat64;
   checksum : text;
@@ -72,6 +76,12 @@ type HttpResponse = record {
   headers : vec HttpHeader;
 };
 type MemorySearchResult = record {
+  document_id : text;
+  "text" : text;
+  chunk_id : text;
+  score : float64;
+};
+type MemorySearchResult_1 = record {
   document_id : text;
   "text" : text;
   chunk_id : text;
@@ -92,12 +102,14 @@ type Result_5 = variant { Ok : vec MemorySearchResult; Err : text };
 type Result_6 = variant { Ok : nat32; Err : text };
 type Result_7 = variant { Ok : vec VectorMatch; Err : text };
 type Result_8 = variant { Ok : vec text; Err : text };
+type Result_9 = variant { Ok : vec MemorySearchResult_1; Err : text };
 type SearchRequest = record {
   collection_id : text;
   "query" : text;
   limit : opt nat32;
   filter : opt text;
   min_score : opt float64;
+  use_approximate : opt bool;
 };
 type SemanticChunk = record {
   id : text;
@@ -173,14 +185,14 @@ service : () -> {
   list_collections_with_stats : () -> (vec CollectionWithStats) query;
   list_documents : (text) -> (vec DocumentMetadata) query;
   remove_collection_admin : (text, text) -> (Result);
-  search : (SearchRequest) -> (Result_5);
-  search_filtered : (SearchRequest) -> (Result_5);
+  search : (SearchRequest) -> (Result_9);
+  search_filtered : (SearchRequest) -> (Result_9);
   set_config : (text, text) -> (Result);
   store_document_chunks : (text, vec SemanticChunk) -> (Result);
   transfer_genesis_admin : (text, text) -> (Result);
   transform_embedding_response : (TransformArgs) -> (HttpResponse) query;
   update_collection_metadata : (text, opt text, opt text) -> (Result);
   update_collection_settings : (text, CollectionSettings) -> (Result);
-  validate_collection_vectors : (text) -> (vec text);
+  validate_collection_vectors : (text, opt bool) -> (vec text);
   wallet_receive : () -> (nat64);
 }

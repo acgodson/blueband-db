@@ -8,7 +8,7 @@ struct CacheEntry {
     vectors: Vec<Vector>,
     timestamp: u64,
     last_accessed: u64,
-    memory_size: usize, // Track memory usage of this entry
+    memory_size: usize,
 }
 
 #[derive(Debug)]

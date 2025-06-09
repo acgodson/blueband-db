@@ -4,20 +4,7 @@
             "type": "rust",
             "package": "blueband_rust",
             "candid": "blueband_rust.did",
-            "build": [
-                "cargo build --target wasm32-unknown-unknown --release --package blueband_rust"
-            ],
-            "wasm": "target/wasm32-unknown-unknown/release/blueband_rust.wasm",
-            "gzip": true,
-            "declarations": {
-                "output": "declarations"
-            },
-            "metadata": [
-                {
-                    "name": "candid:service",
-                    "path": "blueband_rust.did"
-                }
-            ]
+            "wasm": "target/wasm32-unknown-unknown/release/blueband_rust.wasm"
         }
     },
     "networks": {

@@ -1,6 +1,6 @@
 // storage/vectors.rs
 use super::memory::{get_memory, MemoryType, VECTORS_MEMORY_ID, VECTOR_INDEX_MEMORY_ID};
-use ic_stable_structures::{StableBTreeMap, Storable};
+use ic_stable_structures::StableBTreeMap;
 use std::cell::RefCell;
 
 use crate::types::*;
@@ -24,45 +24,6 @@ thread_local! {
 // =============================================================================
 // VECTOR STORAGE OPERATIONS
 // =============================================================================
-
-pub fn store_vector(vector: Vector) -> Result<(), String> {
-    if vector.embedding.is_empty() {
-        return Err("Vector embedding cannot be empty".to_string());
-    }
-
-    if vector.norm <= 0.0 || !vector.norm.is_finite() {
-        return Err("Vector norm must be positive and finite".to_string());
-    }
-
-    let collection_id = extract_collection_id_from_document_id(&vector.document_id)?;
-
-    if !super::collections::collection_exists(&collection_id) {
-        return Err(format!("Collection '{}' not found", collection_id));
-    }
-    if !super::documents::document_exists(&collection_id, &vector.document_id) {
-        return Err(format!("Document '{}' not found", vector.document_id));
-    }
-
-    VECTORS.with(|v| {
-        VECTOR_INDEX.with(|vi| {
-            let mut vectors = v.borrow_mut();
-            let mut index = vi.borrow_mut();
-
-            let vector_exists = vectors.contains_key(&vector.id);
-
-            let mut vector_ids = index.get(&collection_id.to_string()).unwrap_or_default();
-
-            vectors.insert(vector.id.clone(), vector.clone());
-
-            if !vector_exists {
-                vector_ids.0.push(vector.id.clone());
-                index.insert(collection_id.to_string(), vector_ids);
-            }
-
-            Ok(())
-        })
-    })
-}
 
 pub fn get_vector(vector_id: &str) -> Option<Vector> {
     VECTORS.with(|v| v.borrow().get(&vector_id.to_string()))
@@ -109,16 +70,6 @@ pub fn get_collection_vectors(collection_id: &str) -> Vec<Vector> {
             Vec::new()
         }
     })
-}
-
-pub fn get_vectors_for_similarity(collection_id: &str, limit: Option<u32>) -> Vec<Vector> {
-    let mut vectors = get_collection_vectors(collection_id);
-
-    if let Some(limit) = limit {
-        vectors.truncate(limit as usize);
-    }
-
-    vectors
 }
 
 pub fn delete_document_vectors(document_id: &str) -> Result<(), String> {
@@ -183,18 +134,6 @@ pub fn get_document_vectors(document_id: &str) -> Vec<Vector> {
     })
 }
 
-pub fn get_chunk_vector(document_id: &str, chunk_id: &str) -> Option<Vector> {
-    VECTORS.with(|v| {
-        v.borrow().iter().find_map(|(_, vector)| {
-            if vector.document_id == document_id && vector.chunk_id == chunk_id {
-                Some(vector)
-            } else {
-                None
-            }
-        })
-    })
-}
-
 // =============================================================================
 // VECTOR INDEX OPERATIONS (Performance Optimization)
 // =============================================================================
@@ -212,54 +151,78 @@ pub fn cleanup_collection_index(collection_id: &str) {
     VECTOR_INDEX.with(|vi| vi.borrow_mut().remove(&collection_id.to_string()));
 }
 
-/// Adds vector to collection index
-pub fn add_vector_to_collection(collection_id: &str, vector_id: &str) {
-    VECTOR_INDEX.with(|idx| {
-        let mut index = idx.borrow_mut();
-        let mut vector_ids = index.get(&collection_id.to_string()).unwrap_or_default();
-        vector_ids.0.push(vector_id.to_string());
-        index.insert(collection_id.to_string(), vector_ids);
-    });
-}
-
-/// Removes vector from collection index
-pub fn remove_vector_from_collection(collection_id: &str, vector_id: &str) {
-    VECTOR_INDEX.with(|idx| {
-        let mut index = idx.borrow_mut();
-        if let Some(mut vector_ids) = index.get(&collection_id.to_string()) {
-            vector_ids.0.retain(|id| id != vector_id);
-            index.insert(collection_id.to_string(), vector_ids);
-        }
-    });
-}
-
 /// Clears all vectors and vector index
 pub fn clear_vectors() {
     VECTORS.with(|v| v.borrow_mut().clear_new());
     VECTOR_INDEX.with(|idx| idx.borrow_mut().clear_new());
 }
 
-/// Validates vector index integrity (returns issues found)
-pub fn validate_vectors() -> Vec<String> {
-    let mut issues = Vec::new();
+/// Validates and optionally repairs vector index integrity for a specific collection
+/// Returns a report of issues found and any repairs made
+pub fn validate_vectors(collection_id: &str, should_repair: bool) -> Vec<String> {
+    let mut report = Vec::new();
+    
+    // Verify collection exists
+    if !super::collections::collection_exists(collection_id) {
+        report.push(format!("Collection '{}' not found", collection_id));
+        return report;
+    }
 
-    VECTOR_INDEX.with(|idx| {
-        for (collection_id, vector_ids) in idx.borrow().iter() {
-            VECTORS.with(|v| {
-                let vectors = v.borrow();
-                for vector_id in vector_ids.0.iter() {
-                    if !vectors.contains_key(&vector_id.to_string()) {
-                        issues.push(format!(
-                            "Vector {} in collection {} not found in vectors map",
-                            vector_id, collection_id
-                        ));
-                    }
-                }
-            });
+    // Get all vectors for this collection
+    let vectors = get_collection_vectors(collection_id);
+    let mut valid_vector_ids = Vec::new();
+    let mut invalid_vectors = Vec::new();
+
+    // Validate each vector
+    for vector in vectors {
+        let mut is_valid = true;
+        let mut issues = Vec::new();
+
+        // Check if document exists
+        if !super::documents::document_exists(collection_id, &vector.document_id) {
+            issues.push(format!("Document '{}' not found", vector.document_id));
+            is_valid = false;
         }
-    });
 
-    issues
+        // Validate vector data
+        if vector.embedding.is_empty() {
+            issues.push("Empty embedding".to_string());
+            is_valid = false;
+        }
+        if vector.norm <= 0.0 || !vector.norm.is_finite() {
+            issues.push(format!("Invalid norm: {}", vector.norm));
+            is_valid = false;
+        }
+
+        if is_valid {
+            valid_vector_ids.push(vector.id.clone());
+        } else {
+            invalid_vectors.push((vector.id.clone(), issues));
+        }
+    }
+
+    // Report issues found
+    if !invalid_vectors.is_empty() {
+        report.push(format!("Found {} invalid vectors:", invalid_vectors.len()));
+        for (vector_id, issues) in invalid_vectors {
+            report.push(format!("  Vector {}: {}", vector_id, issues.join(", ")));
+        }
+
+        // Only repair if requested and there are issues
+        if should_repair {
+            let valid_count = valid_vector_ids.len();
+            // Rebuild index with only valid vectors
+            VECTOR_INDEX.with(|vi| {
+                let mut index = vi.borrow_mut();
+                index.insert(collection_id.to_string(), StringList(valid_vector_ids));
+            });
+            report.push(format!("Index repaired: {} valid vectors retained", valid_count));
+        }
+    } else {
+        report.push("No issues found".to_string());
+    }
+
+    report
 }
 
 // =============================================================================
@@ -285,7 +248,7 @@ pub fn store_vectors_batch(vectors: Vec<Vector>) -> Result<u32, String> {
         }
     }
 
-    // Group vectors by collection 
+    // Group vectors by collection
     let mut vectors_by_collection: std::collections::HashMap<String, Vec<Vector>> =
         std::collections::HashMap::new();
 
@@ -376,18 +339,6 @@ pub fn find_vectors_by_model(collection_id: &str, model: &str) -> Vec<Vector> {
         .collect()
 }
 
-/// Finds vectors within a date range (storage query)
-pub fn find_vectors_by_date_range(
-    collection_id: &str,
-    start_time: u64,
-    end_time: u64,
-) -> Vec<Vector> {
-    get_collection_vectors(collection_id)
-        .into_iter()
-        .filter(|vector| vector.created_at >= start_time && vector.created_at <= end_time)
-        .collect()
-}
-
 // =============================================================================
 // STORAGE METRICS (Supporting Collection Stats)
 // =============================================================================
@@ -405,19 +356,6 @@ pub fn get_vector_count(collection_id: &str) -> u64 {
             .map(|vector_ids| vector_ids.0.len() as u64)
             .unwrap_or(0)
     })
-}
-
-/// Gets the timestamp of the most recent vector in a collection
-pub fn get_last_vector_update(collection_id: &str) -> Option<u64> {
-    get_collection_vectors(collection_id)
-        .iter()
-        .map(|vector| vector.created_at)
-        .max()
-}
-
-/// Checks if a vector exists by ID
-pub fn vector_exists(vector_id: &str) -> bool {
-    VECTORS.with(|v| v.borrow().contains_key(&vector_id.to_string()))
 }
 
 /// Gets embedding dimensions for a collection (assumes consistent dimensions)
@@ -445,25 +383,3 @@ fn extract_collection_id_from_document_id(document_id: &str) -> Result<String, S
     ))
 }
 
-// Rebuilds vector index from scratch
-// pub fn rebuild_vector_index() -> Result<(), String> {
-//     // Clear existing index
-//     VECTOR_INDEX.with(|vi| vi.borrow_mut().clear_new());
-
-//     // Initialize empty indexes for all collections
-//     for collection in super::collections::list_collections() {
-//         init_collection_index(&collection.id);
-//     }
-
-//     // Rebuild from vectors
-//     VECTORS.with(|v| {
-//         for (vector_id, vector) in v.borrow().iter() {
-//             let vector_id = vector_id.to_string();
-//             if let Ok(collection_id) = extract_collection_id_from_document_id(&vector.document_id) {
-//                 add_vector_to_collection(&collection_id, &vector_id);
-//             }
-//         }
-//     });
-
-//     Ok(())
-// }

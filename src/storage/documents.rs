@@ -1,11 +1,9 @@
 // storage/documents.rs
-use ic_stable_structures::{StableBTreeMap, Storable};
+use ic_stable_structures::StableBTreeMap;
 use std::cell::RefCell;
 
-
 use super::memory::{
-    get_memory, CHUNKS_MEMORY_ID, DOCUMENTS_MEMORY_ID, DOCUMENT_INDEX_MEMORY_ID,
-    MemoryType,
+    get_memory, MemoryType, CHUNKS_MEMORY_ID, DOCUMENTS_MEMORY_ID, DOCUMENT_INDEX_MEMORY_ID,
 };
 use crate::types::*;
 
@@ -36,7 +34,6 @@ thread_local! {
 
 pub fn add_document(request: AddDocumentRequest) -> Result<DocumentMetadata, String> {
     validate_document_content(&request.content)?;
-
 
     let collection = super::collections::get_collection(&request.collection_id)
         .ok_or_else(|| format!("Collection '{}' not found", request.collection_id))?;
@@ -82,7 +79,10 @@ pub fn add_document(request: AddDocumentRequest) -> Result<DocumentMetadata, Str
     DOCUMENTS.with(|d| d.borrow_mut().insert(storage_key, document.clone()));
 
     // Store all chunks for this document
-    DOCUMENT_CHUNKS.with(|c| c.borrow_mut().insert(document_id.clone(), ChunkList(chunks)));
+    DOCUMENT_CHUNKS.with(|c| {
+        c.borrow_mut()
+            .insert(document_id.clone(), ChunkList(chunks))
+    });
 
     // Update document index for collection lookups
     add_to_document_index(&request.collection_id, &document_id);
@@ -109,7 +109,8 @@ pub fn list_documents(collection_id: &str) -> Vec<DocumentMetadata> {
     // O(1) index lookup + O(k) document retrieval where k = docs in collection
     DOCUMENT_INDEX.with(|idx| {
         if let Some(doc_ids) = idx.borrow().get(&collection_id.to_string()) {
-            doc_ids.0
+            doc_ids
+                .0
                 .iter()
                 .filter_map(|doc_id| get_document(collection_id, doc_id))
                 .collect()
@@ -122,7 +123,7 @@ pub fn list_documents(collection_id: &str) -> Vec<DocumentMetadata> {
 pub fn delete_document(collection_id: &str, document_id: &str) -> Result<(), String> {
     // Delete document chunks
     DOCUMENT_CHUNKS.with(|c| c.borrow_mut().remove(&document_id.to_string()));
-    
+
     // Remove from collection index
     DOCUMENT_INDEX.with(|idx| {
         let mut index = idx.borrow_mut();
@@ -154,7 +155,7 @@ pub fn mark_document_embedded(collection_id: &str, document_id: &str) -> Result<
 }
 
 // =============================================================================
-// DOCUMENT INDEX OPERATIONS (for O(1) performance)
+// DOCUMENT INDEX OPERATIONS ( O(1))
 // =============================================================================
 
 pub fn init_collection_document_index(collection_id: &str) {
@@ -177,18 +178,8 @@ fn add_to_document_index(collection_id: &str, document_id: &str) {
     });
 }
 
-fn remove_from_document_index(collection_id: &str, document_id: &str) {
-    DOCUMENT_INDEX.with(|idx| {
-        let mut index = idx.borrow_mut();
-        if let Some(mut doc_ids) = index.get(&collection_id.to_string()) {
-            doc_ids.0.retain(|id| id != document_id);
-            index.insert(collection_id.to_string(), doc_ids);
-        }
-    });
-}
-
 // =============================================================================
-// CHUNK OPERATIONS (Vector Database Optimized)
+// CHUNK OPERATIONS (Vector Database)
 // =============================================================================
 
 pub fn get_document_chunks(document_id: &str) -> Vec<SemanticChunk> {
@@ -212,11 +203,11 @@ pub fn get_chunk(document_id: &str, chunk_id: &str) -> Option<SemanticChunk> {
 }
 
 pub fn get_chunk_text(document_id: &str, chunk_id: &str) -> Option<String> {
-    // Optimized for vector search results - get specific chunk text
+    // get specific chunk text
     get_chunk(document_id, chunk_id).map(|chunk| chunk.text)
 }
 
-pub fn get_document_content(collection_id: &str, document_id: &str) -> Option<String> {
+pub fn get_document_content(_collection_id: &str, document_id: &str) -> Option<String> {
     DOCUMENT_CHUNKS.with(|c| {
         c.borrow()
             .get(&document_id.to_string())
@@ -264,7 +255,6 @@ fn create_semantic_chunks(
         start = end - overlap.min(end);
     }
 
-    // Return chunks already sorted by position
     chunks
 }
 
@@ -283,7 +273,7 @@ pub fn count_chunks() -> u64 {
 }
 
 pub fn count_collection_documents(collection_id: &str) -> u64 {
-    // O(1) index lookup instead of O(n) scan
+    // O(1) index lookup
     DOCUMENT_INDEX.with(|idx| {
         idx.borrow()
             .get(&collection_id.to_string())
@@ -292,35 +282,6 @@ pub fn count_collection_documents(collection_id: &str) -> u64 {
     })
 }
 
-pub fn calculate_collection_size(collection_id: &str) -> u64 {
-    // O(k) where k = docs in collection, not O(n) where n = all docs
-    DOCUMENT_INDEX.with(|idx| {
-        if let Some(doc_ids) = idx.borrow().get(&collection_id.to_string()) {
-            doc_ids.0
-                .iter()
-                .filter_map(|doc_id| get_document(collection_id, doc_id))
-                .map(|doc| doc.size)
-                .sum()
-        } else {
-            0
-        }
-    })
-}
-
-pub fn get_last_document_update(collection_id: &str) -> Option<u64> {
-    // O(k) where k = docs in collection, not O(n) where n = all docs
-    DOCUMENT_INDEX.with(|idx| {
-        if let Some(doc_ids) = idx.borrow().get(&collection_id.to_string()) {
-            doc_ids.0
-                .iter()
-                .filter_map(|doc_id| get_document(collection_id, doc_id))
-                .map(|doc| doc.timestamp)
-                .max()
-        } else {
-            None
-        }
-    })
-}
 
 pub fn document_exists(collection_id: &str, document_id: &str) -> bool {
     let storage_key = format!("{}::{}", collection_id, document_id);
@@ -329,12 +290,6 @@ pub fn document_exists(collection_id: &str, document_id: &str) -> bool {
 
 pub fn get_document_title(collection_id: &str, document_id: &str) -> Option<String> {
     get_document(collection_id, document_id).map(|doc| doc.title)
-}
-
-pub fn find_document_by_title(collection_id: &str, title: &str) -> Option<DocumentMetadata> {
-    list_documents(collection_id)
-        .into_iter()
-        .find(|doc| doc.title == title)
 }
 
 // Simple token estimation
@@ -357,7 +312,8 @@ pub fn get_collection_documents(collection_id: &str) -> Vec<DocumentMetadata> {
         if let Some(doc_ids) = idx.borrow().get(&collection_id.to_string()) {
             DOCUMENTS.with(|d| {
                 let documents = d.borrow();
-                doc_ids.0
+                doc_ids
+                    .0
                     .iter()
                     .filter_map(|id| documents.get(&id.to_string()))
                     .collect()
@@ -389,25 +345,6 @@ pub fn delete_collection_documents(collection_id: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub fn add_document_to_collection(collection_id: &str, document_id: &str) {
-    DOCUMENT_INDEX.with(|idx| {
-        let mut index = idx.borrow_mut();
-        let mut doc_ids = index.get(&collection_id.to_string()).unwrap_or_default();
-        doc_ids.0.push(document_id.to_string());
-        index.insert(collection_id.to_string(), doc_ids);
-    });
-}
-
-pub fn remove_document_from_collection(collection_id: &str, document_id: &str) {
-    DOCUMENT_INDEX.with(|idx| {
-        let mut index = idx.borrow_mut();
-        if let Some(mut doc_ids) = index.get(&collection_id.to_string()) {
-            doc_ids.0.retain(|id| id != document_id);
-            index.insert(collection_id.to_string(), doc_ids);
-        }
-    });
-}
-
 pub fn get_document_chunks_by_document_id(document_id: &str) -> Vec<SemanticChunk> {
     DOCUMENT_CHUNKS.with(|c| {
         c.borrow()
@@ -417,15 +354,9 @@ pub fn get_document_chunks_by_document_id(document_id: &str) -> Vec<SemanticChun
     })
 }
 
-pub fn get_total_chunks() -> u64 {
-    DOCUMENT_CHUNKS.with(|c| {
-        c.borrow()
-            .iter()
-            .map(|(_, chunks)| chunks.0.len() as u64)
-            .sum()
-    })
-}
-
 pub fn store_document_chunks(document_id: &str, chunks: Vec<SemanticChunk>) {
-    DOCUMENT_CHUNKS.with(|c| c.borrow_mut().insert(document_id.to_string(), ChunkList(chunks)));
+    DOCUMENT_CHUNKS.with(|c| {
+        c.borrow_mut()
+            .insert(document_id.to_string(), ChunkList(chunks))
+    });
 }
