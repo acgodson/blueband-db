@@ -32,6 +32,26 @@ thread_local! {
 // DOCUMENT OPERATIONS
 // =============================================================================
 
+fn validate_document_metadata(document: &DocumentMetadata) -> Result<(), String> {
+    if document.title.is_empty() {
+        return Err("Document title cannot be empty".to_string());
+    }
+    if document.title.len() > 200 {
+        return Err("Document title exceeds 200 character limit".to_string());
+    }
+    if let Some(tags) = &document.tags {
+        if tags.len() > 20 {
+            return Err("Document cannot have more than 20 tags".to_string());
+        }
+        for tag in tags {
+            if tag.len() > 50 {
+                return Err("Tag length cannot exceed 50 characters".to_string());
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn add_document(request: AddDocumentRequest) -> Result<DocumentMetadata, String> {
     validate_document_content(&request.content)?;
 
@@ -74,6 +94,8 @@ pub fn add_document(request: AddDocumentRequest) -> Result<DocumentMetadata, Str
         author: request.author,
         tags: request.tags,
     };
+
+    validate_document_metadata(&document)?;
 
     // Store document metadata
     DOCUMENTS.with(|d| d.borrow_mut().insert(storage_key, document.clone()));
@@ -123,6 +145,9 @@ pub fn list_documents(collection_id: &str) -> Vec<DocumentMetadata> {
 pub fn delete_document(collection_id: &str, document_id: &str) -> Result<(), String> {
     // Delete document chunks
     DOCUMENT_CHUNKS.with(|c| c.borrow_mut().remove(&document_id.to_string()));
+
+    // Delete associated vectors
+    let _ = super::vectors::delete_document_vectors(document_id);
 
     // Remove from collection index
     DOCUMENT_INDEX.with(|idx| {
@@ -228,31 +253,57 @@ fn create_semantic_chunks(
     let overlap = settings.chunk_overlap as usize;
     let mut chunks = Vec::new();
     let mut position = 0u32;
-    let mut start = 0;
 
-    while start < content.len() {
-        let end = (start + chunk_size).min(content.len());
-        let chunk_text = content[start..end].to_string();
+    // Convert content to char iterator with positions
+    let mut char_indices = content.char_indices().peekable();
+
+    
+    while let Some((start_byte, _)) = char_indices.next() {
+        let mut char_count = 0;
+        let mut end_byte = start_byte;
+
+        // Count characters until we reach chunk_size or end of content
+        while char_count < chunk_size {
+            if let Some((next_byte, _)) = char_indices.peek() {
+                end_byte = *next_byte;
+                char_indices.next();
+                char_count += 1;
+            } else {
+                end_byte = content.len();
+                break;
+            }
+        }
+
+        // Extract the chunk text
+        let chunk_text = content[start_byte..end_byte].to_string();
+        let token_count = estimate_tokens(&chunk_text);
 
         if !chunk_text.trim().is_empty() {
             let chunk_id = format!("chunk_{}", position);
             chunks.push(SemanticChunk {
                 id: chunk_id,
                 document_id: document_id.to_string(),
-                text: chunk_text.clone(),
+                text: chunk_text,
                 position,
-                char_start: start as u64,
-                char_end: end as u64,
-                token_count: Some(estimate_tokens(&chunk_text)),
+                char_start: start_byte as u64,
+                char_end: end_byte as u64,
+                token_count: Some(token_count),
             });
             position += 1;
         }
 
-        if end >= content.len() {
+        // Move back for overlap
+        if end_byte < content.len() {
+            // Reset char_indices to the overlap position
+            char_indices = content.char_indices().peekable();
+            while let Some((pos, _)) = char_indices.next() {
+                if pos >= end_byte - overlap {
+                    break;
+                }
+            }
+        } else {
             break;
         }
-
-        start = end - overlap.min(end);
     }
 
     chunks
@@ -281,7 +332,6 @@ pub fn count_collection_documents(collection_id: &str) -> u64 {
             .unwrap_or(0)
     })
 }
-
 
 pub fn document_exists(collection_id: &str, document_id: &str) -> bool {
     let storage_key = format!("{}::{}", collection_id, document_id);
