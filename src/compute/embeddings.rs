@@ -143,61 +143,66 @@ pub async fn embed_document_chunks(
         return Ok(Vec::new());
     }
 
-    if chunks.len() > 50 {
-        return Err("Too many chunks in single request (max 50)".to_string());
-    }
-
-    let texts: Vec<String> = chunks.iter().map(|chunk| chunk.text.clone()).collect();
-
+    // Process chunks in smaller batches to stay within HTTP limits
+    const BATCH_SIZE: usize = 3; // Reduced from 5 to 3 to stay well under 50KB
+    let mut all_vectors = Vec::new();
     let model = parse_embedding_model(&collection_settings.embedding_model)?;
 
-    let request = EmbeddingRequest {
-        texts,
-        model: model.clone(),
-        proxy_url,
-    };
-
-    let response = get_embeddings_async(request).await?;
-
-    if response.embeddings.len() != chunks.len() {
-        return Err(format!(
-            "Embedding count mismatch: expected {}, got {}",
-            chunks.len(),
-            response.embeddings.len()
-        ));
-    }
-
-    let mut vectors = Vec::new();
-
-    for (chunk, embedding) in chunks.iter().zip(response.embeddings.iter()) {
-        validate_embedding(embedding)?;
-
-        let norm = calculate_norm(embedding)?;
-
-        let vector = Vector {
-            id: generate_id("vec", &chunk.id),
-            document_id: chunk.document_id.clone(),
-            chunk_id: chunk.id.clone(),
-            embedding: embedding.clone(),
-            norm,
-            model: response.model.clone(),
-            created_at: current_time(),
+    for chunk_batch in chunks.chunks(BATCH_SIZE) {
+        let texts: Vec<String> = chunk_batch.iter().map(|chunk| chunk.text.clone()).collect();
+        
+        let request = EmbeddingRequest {
+            texts,
+            model: model.clone(),
+            proxy_url: proxy_url.clone(),
         };
 
-        ic_cdk::println!(
-            "Created vector - ID: {}, Document: {}, Chunk: {}, Dimensions: {}, Norm: {:.4}, Model: {}",
-            vector.id,
-            vector.document_id,
-            vector.chunk_id,
-            vector.embedding.len(),
-            vector.norm,
-            vector.model
-        );
+        // Validate request body size before sending
+        let request_body = create_embedding_request_body(&request)?;
+        if request_body.len() > 45_000 { // Leave some buffer for headers
+            return Err("Request body too large, try reducing batch size or chunk size".to_string());
+        }
 
-        vectors.push(vector);
+        let response = get_embeddings_async(request).await?;
+
+        if response.embeddings.len() != chunk_batch.len() {
+            return Err(format!(
+                "Embedding count mismatch: expected {}, got {}",
+                chunk_batch.len(),
+                response.embeddings.len()
+            ));
+        }
+
+        for (chunk, embedding) in chunk_batch.iter().zip(response.embeddings.iter()) {
+            validate_embedding(embedding)?;
+
+            let norm = calculate_norm(embedding)?;
+
+            let vector = Vector {
+                id: generate_id("vec", &chunk.id),
+                document_id: chunk.document_id.clone(),
+                chunk_id: chunk.id.clone(),
+                embedding: embedding.clone(),
+                norm,
+                model: response.model.clone(),
+                created_at: current_time(),
+            };
+
+            ic_cdk::println!(
+                "Created vector - ID: {}, Document: {}, Chunk: {}, Dimensions: {}, Norm: {:.4}, Model: {}",
+                vector.id,
+                vector.document_id,
+                vector.chunk_id,
+                vector.embedding.len(),
+                vector.norm,
+                vector.model
+            );
+
+            all_vectors.push(vector);
+        }
     }
 
-    Ok(vectors)
+    Ok(all_vectors)
 }
 
 pub async fn embed_query_text(
